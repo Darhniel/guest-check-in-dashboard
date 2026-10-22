@@ -1,148 +1,192 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { api } from '@/lib/api';
-import { Event } from '@/types';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import Link from 'next/link';
+import { useState } from 'react';
 import {
-    ArrowLeft,
-    Calendar,
-    MapPin,
-    Loader2,
-    Users,
     BarChart3,
+    CalendarDays,
     Info,
+    KeyRound,
+    MapPin,
+    Pencil,
+    Users,
 } from 'lucide-react';
-import { format, parseISO, isWithinInterval, isFuture } from 'date-fns';
+import type { Event } from '@/types';
+import { useApiQuery } from '@/hooks/useApi';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { StatusBadge } from '@/components/common/StatusBadge';
+import { ErrorState } from '@/components/common/ErrorState';
+import { Skeleton } from '@/components/common/Skeleton';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { EventOverview } from '@/components/events/EventOverview';
 import { EventAmbassadors } from '@/components/events/EventAmbassadors';
 import { EventAnalytics } from '@/components/events/EventAnalytics';
+import { EventOrganizerApi } from '@/components/events/EventOrganizerApi';
+import { EventGuests } from '@/components/events/EventGuests';
+import { eventStatusMeta, formatEventDates, getEventStatus, pluralize } from '@/lib/format';
 
 export default function EventDetailPage() {
     const params = useParams();
-    const id = Array.isArray(params.id) ? params.id[0] : params.id;
-
     const router = useRouter();
-    const [event, setEvent] = useState<Event | null>(null);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        if (!id) return;
-        loadEvent();
-    }, [id]);
-
-    const loadEvent = async () => {
-        try {
-            const data = await api<Event>(`/events/${id}/`);
-            setEvent(data);
-        } catch (e) {
-            console.error(e);
-            router.push('/dashboard/events');
-        } finally {
-            setLoading(false);
-        }
-    };
+    const id = Array.isArray(params.id) ? params.id[0] : params.id;
+    const { data: event, loading, error, refetch } = useApiQuery<Event>(
+        id ? `/events/${id}/` : null
+    );
+    const [tab, setTab] = useState('overview');
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center h-96">
-                <Loader2 className="w-8 h-8 animate-spin text-neutral-400" />
+            <div className="space-y-5">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-9 w-72 max-w-full" />
+                <Skeleton className="h-4 w-96 max-w-full" />
+                <Skeleton className="mt-6 h-10 w-80 max-w-full" />
+                <div className="grid gap-4 lg:grid-cols-3">
+                    <Skeleton className="h-[280px] rounded-xl lg:col-span-2" />
+                    <Skeleton className="h-[280px] rounded-xl" />
+                </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="space-y-5">
+                <PageHeader
+                    backHref="/dashboard/events"
+                    backLabel="All events"
+                    title="Event"
+                    description="We couldn't load this event."
+                />
+                <ErrorState description={error} onRetry={() => void refetch()} />
+                <Button variant="outline" onClick={() => router.push('/dashboard/events')}>
+                    Back to events
+                </Button>
             </div>
         );
     }
 
     if (!event) return null;
 
-    const getEventStatus = () => {
-        try {
-            const start = parseISO(event.start_date);
-            const end = parseISO(event.end_date);
-            const now = new Date();
-
-            if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-                return { label: 'Unknown', color: 'bg-neutral-100 text-neutral-600' };
-            }
-
-            if (isFuture(start)) return { label: 'Upcoming', color: 'bg-blue-100 text-blue-700' };
-            if (isWithinInterval(now, { start, end })) return { label: 'Live', color: 'bg-green-100 text-green-700' };
-            return { label: 'Ended', color: 'bg-neutral-100 text-neutral-600' };
-        } catch (e) {
-            console.error("Date parsing error:", e);
-            return { label: 'Unknown', color: 'bg-neutral-100 text-neutral-600' };
-        }
-    };
-
-    const status = getEventStatus();
+    const status = eventStatusMeta[getEventStatus(event)];
 
     return (
-        <div>
-            {/* Header */}
-            <div className="mb-6">
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => router.push('/dashboard/events')}
-                    className="mb-4"
-                >
-                    <ArrowLeft className="w-4 h-4 mr-2" />
-                    Back to Events
-                </Button>
-
-                <div className="flex items-start justify-between">
-                    <div>
-                        <div className="flex items-center gap-3 mb-2">
-                            <h1 className="text-3xl font-bold text-neutral-900">{event.name}</h1>
-                            <Badge className={status.color}>{status.label}</Badge>
+        <div className="space-y-5 sm:space-y-6">
+            <div className="animate-enter">
+                <PageHeader
+                    backHref="/dashboard/events"
+                    backLabel="All events"
+                    eyebrow="Event"
+                    title={event.name}
+                    description={
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                            <StatusBadge
+                                label={status.label}
+                                tone={status.tone}
+                                pulse={status.label === 'Live'}
+                            />
+                            <span className="inline-flex items-center gap-1.5">
+                                <CalendarDays className="size-3.5 text-muted-foreground" />
+                                {formatEventDates(event.start_date, event.end_date)}
+                            </span>
+                            {event.location_text ? (
+                                <span className="inline-flex min-w-0 items-center gap-1.5">
+                                    <MapPin className="size-3.5 shrink-0 text-muted-foreground" />
+                                    <span className="truncate">{event.location_text}</span>
+                                </span>
+                            ) : null}
+                            <span className="inline-flex items-center gap-1.5">
+                                <Users className="size-3.5 text-muted-foreground" />
+                                {pluralize(event.locations.length, 'location')}
+                            </span>
                         </div>
-                        <div className="flex items-center gap-6 text-sm text-neutral-500">
-                            <div className="flex items-center gap-1.5">
-                                <Calendar className="w-4 h-4" />
-                                {format(parseISO(event.start_date), 'MMM d')} –{' '}
-                                {format(parseISO(event.end_date), 'MMM d, yyyy')}
-                            </div>
-                            {event.location_text && (
-                                <div className="flex items-center gap-1.5">
-                                    <MapPin className="w-4 h-4" />
-                                    {event.location_text}
-                                </div>
-                            )}
-                            <div className="flex items-center gap-1.5">
-                                <Users className="w-4 h-4" />
-                                {event.locations.length} location{event.locations.length !== 1 ? 's' : ''}
-                            </div>
+                    }
+                    actions={
+                        <div className="flex items-center gap-2">
+                            <Button
+                                variant="outline"
+                                render={
+                                    <Link
+                                        href={`/dashboard/events/${event.id}/edit`}
+                                    />
+                                }
+                            >
+                                <Pencil className="size-4" />
+                                Edit event
+                            </Button>
+                            <Button
+                                variant="outline"
+                                onClick={() => setTab('ambassadors')}
+                                className="max-sm:hidden"
+                            >
+                                <Users className="size-4" />
+                                Manage team
+                            </Button>
                         </div>
-                    </div>
-                </div>
+                    }
+                />
             </div>
 
-            {/* Tabs */}
-            <Tabs defaultValue="overview" className="w-full">
-                <TabsList className="bg-white border border-neutral-200">
-                    <TabsTrigger value="overview" className="gap-2">
-                        <Info className="w-4 h-4" />
-                        Overview
-                    </TabsTrigger>
-                    <TabsTrigger value="ambassadors" className="gap-2">
-                        <Users className="w-4 h-4" />
-                        Ambassadors
-                    </TabsTrigger>
-                    <TabsTrigger value="analytics" className="gap-2">
-                        <BarChart3 className="w-4 h-4" />
-                        Analytics
-                    </TabsTrigger>
-                </TabsList>
+            <Tabs value={tab} onValueChange={setTab} className="w-full">
+                <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+                    <TabsList
+                        variant="line"
+                        className="h-10 w-full min-w-max justify-start gap-5 border-b border-border px-0.5 pb-0"
+                    >
+                        <TabsTrigger
+                            value="overview"
+                            className="h-10 flex-none gap-2 px-0.5 pb-3 text-[13px] data-active:after:bottom-0"
+                        >
+                            <Info className="size-3.5" />
+                            Overview
+                        </TabsTrigger>
+                        <TabsTrigger
+                            value="ambassadors"
+                            className="h-10 flex-none gap-2 px-0.5 pb-3 text-[13px] data-active:after:bottom-0"
+                        >
+                            <Users className="size-3.5" />
+                            Ambassadors
+                        </TabsTrigger>
+                        <TabsTrigger
+                            value="guests"
+                            className="h-10 flex-none gap-2 px-0.5 pb-3 text-[13px] data-active:after:bottom-0"
+                        >
+                            <Users className="size-3.5" />
+                            Guests
+                        </TabsTrigger>
+                        <TabsTrigger
+                            value="organizer"
+                            className="h-10 flex-none gap-2 px-0.5 pb-3 text-[13px] data-active:after:bottom-0"
+                        >
+                            <KeyRound className="size-3.5" />
+                            Organizer
+                        </TabsTrigger>
+                        <TabsTrigger
+                            value="analytics"
+                            className="h-10 flex-none gap-2 px-0.5 pb-3 text-[13px] data-active:after:bottom-0"
+                        >
+                            <BarChart3 className="size-3.5" />
+                            Analytics
+                        </TabsTrigger>
+                    </TabsList>
+                </div>
 
-                <TabsContent value="overview" className="mt-6">
+                <TabsContent value="overview" className="mt-5 animate-fade">
                     <EventOverview event={event} />
                 </TabsContent>
-                <TabsContent value="ambassadors" className="mt-6">
+                <TabsContent value="ambassadors" className="mt-5 animate-fade">
                     <EventAmbassadors eventId={event.id} />
                 </TabsContent>
-                <TabsContent value="analytics" className="mt-6">
-                    <EventAnalytics eventId={event.id} />
+                <TabsContent value="guests" className="mt-5 animate-fade">
+                    <EventGuests eventId={event.id} />
+                </TabsContent>
+                <TabsContent value="organizer" className="mt-5 animate-fade">
+                    <EventOrganizerApi eventId={event.id} />
+                </TabsContent>
+                <TabsContent value="analytics" className="mt-5 animate-fade">
+                    <EventAnalytics eventId={event.id} event={event} />
                 </TabsContent>
             </Tabs>
         </div>

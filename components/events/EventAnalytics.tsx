@@ -1,243 +1,500 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { api } from '@/lib/api';
-import { EventAnalytics as AnalyticsData } from '@/types';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, MapPin, Users, Tag, TrendingUp } from 'lucide-react';
+import type { ReactNode } from 'react';
 import {
-    PieChart,
-    Pie,
+    BarChart3,
+    MapPin,
+    PieChart as PieChartIcon,
+    TrendingUp,
+    Users,
+} from 'lucide-react';
+import {
     Cell,
-    BarChart,
-    Bar,
-    XAxis,
-    YAxis,
-    Tooltip,
+    Pie,
+    PieChart,
     ResponsiveContainer,
-    CartesianGrid,
 } from 'recharts';
+import type { AccreditationLogEntry, Event, EventAnalytics as AnalyticsData } from '@/types';
+import { useApiQuery } from '@/hooks/useApi';
+import { Avatar } from '@/components/common/Avatar';
+import { EmptyState } from '@/components/common/EmptyState';
+import { ErrorState } from '@/components/common/ErrorState';
+import { Skeleton } from '@/components/common/Skeleton';
+import { formatNumber, formatTime, percent } from '@/lib/format';
+import { cn } from '@/lib/utils';
 
 interface Props {
     eventId: number;
+    event: Event;
 }
 
-const COLORS = ['#22C55E', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#6B7280'];
+const FALLBACK_COLORS = [
+    'var(--chart-1)',
+    'var(--chart-2)',
+    'var(--chart-3)',
+    'var(--chart-4)',
+    'var(--chart-5)',
+];
 
-export function EventAnalytics({ eventId }: Props) {
-    const [data, setData] = useState<AnalyticsData | null>(null);
-    const [loading, setLoading] = useState(true);
+function Panel({
+    children,
+    className,
+}: {
+    children: ReactNode;
+    className?: string;
+}) {
+    return (
+        <section
+            className={cn(
+                'rounded-xl bg-card shadow-card ring-1 ring-border',
+                className
+            )}
+        >
+            {children}
+        </section>
+    );
+}
 
-    useEffect(() => {
-        loadAnalytics();
-    }, [eventId]);
+function PanelTitle({
+    icon: Icon,
+    title,
+    description,
+}: {
+    icon: typeof Users;
+    title: string;
+    description?: string;
+}) {
+    return (
+        <div className="flex items-start gap-2.5 px-4 pt-4 pb-3 sm:px-5 sm:pt-5">
+            <Icon
+                className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+                strokeWidth={1.9}
+            />
+            <div>
+                <h2 className="text-[14px] font-semibold">{title}</h2>
+                {description ? (
+                    <p className="mt-0.5 text-[11.5px] text-muted-foreground">
+                        {description}
+                    </p>
+                ) : null}
+            </div>
+        </div>
+    );
+}
 
-    const loadAnalytics = async () => {
-        try {
-            const result = await api<AnalyticsData>(`/admin/events/${eventId}/analytics/`);
-            setData(result);
-        } catch (e) {
-            console.error("Failed to load analytics:", e);
-        } finally {
-            setLoading(false);
-        }
-    };
+function Kpi({
+    label,
+    value,
+    icon: Icon,
+    tone,
+    hint,
+    className,
+}: {
+    label: string;
+    value: string;
+    icon: typeof Users;
+    tone: string;
+    hint?: string;
+    className?: string;
+}) {
+    return (
+        <div
+            className={cn(
+                'flex flex-col justify-between gap-3 rounded-xl bg-card p-4 shadow-card ring-1 ring-border',
+                className
+            )}
+        >
+            <div className="flex items-start justify-between gap-2">
+                <p className="text-[10px] font-medium tracking-[0.09em] text-muted-foreground uppercase">
+                    {label}
+                </p>
+                <span
+                    className={cn(
+                        'flex size-8 items-center justify-center rounded-lg',
+                        tone
+                    )}
+                >
+                    <Icon className="size-4" strokeWidth={1.9} />
+                </span>
+            </div>
+            <div>
+                <p className="text-[24px] leading-none font-semibold tracking-[-0.03em] tabular-nums">
+                    {value}
+                </p>
+                {hint ? (
+                    <p className="mt-1.5 text-[11px] text-muted-foreground">{hint}</p>
+                ) : null}
+            </div>
+        </div>
+    );
+}
 
-    if (loading) {
+export function EventAnalytics({ eventId, event }: Props) {
+    const { data, loading, error, refetch } = useApiQuery<AnalyticsData>(
+        `/admin/events/${eventId}/analytics/`
+    );
+
+    if (loading && !data) {
         return (
-            <div className="flex items-center justify-center h-64">
-                <Loader2 className="w-8 h-8 animate-spin text-neutral-400" />
+            <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+                    {Array.from({ length: 3 }).map((_, index) => (
+                        <Skeleton
+                            key={index}
+                            className={cn(
+                                'h-[116px] rounded-xl',
+                                index === 2 && 'col-span-2 lg:col-span-1'
+                            )}
+                        />
+                    ))}
+                </div>
+                <div className="grid gap-4 lg:grid-cols-2">
+                    <Skeleton className="h-[360px] rounded-xl" />
+                    <Skeleton className="h-[360px] rounded-xl" />
+                </div>
+                <Skeleton className="h-[300px] rounded-xl" />
             </div>
         );
     }
 
+    if (error) {
+        return <ErrorState description={error} onRetry={() => void refetch()} />;
+    }
+
     if (!data) return null;
 
-    const completionRate = data.total_guests > 0
-        ? Math.round((data.checked_in_today / data.total_guests) * 100)
-        : 0;
+    const rate = percent(data.checked_in_today, data.total_guests);
 
-    const categoryData = data.by_category.map((c) => ({
-        name: c.guest__category__name || 'Uncategorized',
-        value: c.count,
-    }));
+    const categoryData = data.by_category.map((category, index) => {
+        const match = event.categories.find(
+            (item) => item.name === category.guest__category__name
+        );
+        return {
+            name: category.guest__category__name || 'Uncategorized',
+            value: category.count,
+            color: match?.color ?? FALLBACK_COLORS[index % FALLBACK_COLORS.length],
+        };
+    });
 
-    const locationData = data.by_location.map((l) => ({
-        name: l.location__name || 'No location',
-        count: l.count,
-    }));
+    const categoryTotal = categoryData.reduce((sum, item) => sum + item.value, 0);
+    const maxLocation = Math.max(
+        1,
+        ...data.by_location.map((location) => location.count)
+    );
+    const maxAmbassador = Math.max(
+        1,
+        ...data.by_ambassador.map((ambassador) => ambassador.count)
+    );
 
     return (
-        <div className="space-y-6">
-            {/* Summary Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card>
-                    <CardContent className="pt-6">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                                <Users className="w-5 h-5 text-blue-700" />
-                            </div>
-                            <div>
-                                <div className="text-2xl font-bold text-neutral-900">{data.total_guests}</div>
-                                <div className="text-sm text-neutral-500">Total Guests</div>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardContent className="pt-6">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                                <TrendingUp className="w-5 h-5 text-green-700" />
-                            </div>
-                            <div>
-                                <div className="text-2xl font-bold text-neutral-900">{data.checked_in_today}</div>
-                                <div className="text-sm text-neutral-500">Checked In Today</div>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardContent className="pt-6">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
-                                <Tag className="w-5 h-5 text-amber-700" />
-                            </div>
-                            <div>
-                                <div className="text-2xl font-bold text-neutral-900">{completionRate}%</div>
-                                <div className="text-sm text-neutral-500">Completion Rate</div>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
+        <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+                <Kpi
+                    label="Total guests"
+                    value={formatNumber(data.total_guests)}
+                    icon={Users}
+                    tone="bg-brand-subtle text-brand"
+                    hint="On the guest list"
+                />
+                <Kpi
+                    label="Checked in today"
+                    value={formatNumber(data.checked_in_today)}
+                    icon={TrendingUp}
+                    tone="bg-success-subtle text-success"
+                    hint="Accredited so far"
+                />
+                <Kpi
+                    label="Check-in rate"
+                    value={`${rate}%`}
+                    icon={BarChart3}
+                    tone="bg-warning-subtle text-warning"
+                    hint={`${formatNumber(
+                        Math.max(0, data.total_guests - data.checked_in_today)
+                    )} guests remaining`}
+                    className="col-span-2 lg:col-span-1"
+                />
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Category Breakdown */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>By Category</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        {categoryData.length === 0 ? (
-                            <div className="h-64 flex items-center justify-center text-neutral-400 text-sm">
-                                No data yet
+            <div className="grid gap-4 lg:grid-cols-2">
+                <Panel>
+                    <PanelTitle
+                        icon={PieChartIcon}
+                        title="Guest mix"
+                        description="Distribution across categories"
+                    />
+                    <div className="px-4 pb-4 sm:px-5 sm:pb-5">
+                        {categoryData.length === 0 || categoryTotal === 0 ? (
+                            <div className="py-6">
+                                <EmptyState
+                                    compact
+                                    icon={<PieChartIcon />}
+                                    title="No guest data yet"
+                                    description="Categories will appear once guests are registered."
+                                    className="border-0 bg-transparent py-4"
+                                />
                             </div>
                         ) : (
-                            <div className="h-64">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <PieChart>
-                                        <Pie
-                                            data={categoryData}
-                                            cx="50%"
-                                            cy="50%"
-                                            innerRadius={60}
-                                            outerRadius={90}
-                                            paddingAngle={2}
-                                            dataKey="value"
-                                        >
-                                            {categoryData.map((_, index) => (
-                                                <Cell key={index} fill={COLORS[index % COLORS.length]} />
-                                            ))}
-                                        </Pie>
-                                        <Tooltip />
-                                    </PieChart>
-                                </ResponsiveContainer>
-                                <div className="flex flex-wrap gap-3 justify-center mt-4">
-                                    {categoryData.map((cat, i) => (
-                                        <div key={cat.name} className="flex items-center gap-2 text-sm">
-                                            <div
-                                                className="w-3 h-3 rounded-sm"
-                                                style={{ backgroundColor: COLORS[i % COLORS.length] }}
-                                            />
-                                            <span className="text-neutral-700">{cat.name}</span>
-                                            <span className="text-neutral-400">({cat.value})</span>
-                                        </div>
-                                    ))}
+                            <div className="flex flex-col items-center gap-4">
+                                <div className="relative h-[200px] w-full">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <PieChart>
+                                            <Pie
+                                                data={categoryData}
+                                                dataKey="value"
+                                                nameKey="name"
+                                                cx="50%"
+                                                cy="50%"
+                                                innerRadius={62}
+                                                outerRadius={88}
+                                                paddingAngle={2}
+                                                cornerRadius={4}
+                                                stroke="none"
+                                                animationDuration={600}
+                                            >
+                                                {categoryData.map((entry) => (
+                                                    <Cell
+                                                        key={entry.name}
+                                                        fill={entry.color}
+                                                    />
+                                                ))}
+                                            </Pie>
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                    <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                                        <span className="text-[24px] leading-none font-semibold tracking-[-0.03em] tabular-nums">
+                                            {formatNumber(categoryTotal)}
+                                        </span>
+                                        <span className="mt-1.5 text-[10px] text-muted-foreground">
+                                            guests
+                                        </span>
+                                    </div>
                                 </div>
+
+                                <ul className="w-full space-y-1">
+                                    {categoryData.map((entry) => (
+                                        <li
+                                            key={entry.name}
+                                            className="flex items-center gap-2.5 rounded-md px-1.5 py-1.5"
+                                        >
+                                            <span
+                                                className="size-2.5 shrink-0 rounded-full"
+                                                style={{ backgroundColor: entry.color }}
+                                            />
+                                            <span className="min-w-0 flex-1 truncate text-[12.5px]">
+                                                {entry.name}
+                                            </span>
+                                            <span className="text-[12px] text-muted-foreground tabular-nums">
+                                                {percent(entry.value, categoryTotal)}%
+                                            </span>
+                                            <span className="w-12 text-right text-[12px] font-medium tabular-nums">
+                                                {formatNumber(entry.value)}
+                                            </span>
+                                        </li>
+                                    ))}
+                                </ul>
                             </div>
                         )}
-                    </CardContent>
-                </Card>
+                    </div>
+                </Panel>
 
-                {/* Location Breakdown */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <MapPin className="w-4 h-4" />
-                            By Location
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        {locationData.length === 0 ? (
-                            <div className="h-64 flex items-center justify-center text-neutral-400 text-sm">
-                                No data yet
+                <Panel>
+                    <PanelTitle
+                        icon={MapPin}
+                        title="By location"
+                        description="Where guests were accredited"
+                    />
+                    <div className="px-4 pb-4 sm:px-5 sm:pb-5">
+                        {data.by_location.length === 0 ? (
+                            <div className="py-6">
+                                <EmptyState
+                                    compact
+                                    icon={<MapPin />}
+                                    title="No location data"
+                                    description="Check-ins by accreditation point will show up here."
+                                    className="border-0 bg-transparent py-4"
+                                />
                             </div>
                         ) : (
-                            <div className="h-64">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={locationData} layout="vertical">
-                                        <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                                        <XAxis type="number" stroke="#9CA3AF" fontSize={12} allowDecimals={false} />
-                                        <YAxis
-                                            type="category"
-                                            dataKey="name"
-                                            stroke="#9CA3AF"
-                                            fontSize={12}
-                                            width={100}
-                                        />
-                                        <Tooltip
-                                            contentStyle={{
-                                                backgroundColor: '#fff',
-                                                border: '1px solid #E5E7EB',
-                                                borderRadius: '8px',
-                                            }}
-                                        />
-                                        <Bar dataKey="count" fill="#111827" radius={[0, 4, 4, 0]} />
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </div>
+                            <ul className="space-y-4 pt-1">
+                                {data.by_location.map((location) => (
+                                    <li key={location.location__name ?? 'none'}>
+                                        <div className="flex items-baseline justify-between gap-3">
+                                            <span className="truncate text-[12.5px]">
+                                                {location.location__name || 'No location'}
+                                            </span>
+                                            <span className="text-[12px] font-medium tabular-nums">
+                                                {formatNumber(location.count)}
+                                            </span>
+                                        </div>
+                                        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+                                            <div
+                                                className="h-full rounded-full bg-brand transition-[width] duration-700 ease-out-soft"
+                                                style={{
+                                                    width: `${Math.round(
+                                                        (location.count / maxLocation) * 100
+                                                    )}%`,
+                                                }}
+                                            />
+                                        </div>
+                                    </li>
+                                ))}
+                            </ul>
                         )}
-                    </CardContent>
-                </Card>
+                    </div>
+                </Panel>
             </div>
 
-            {/* Ambassador Leaderboard */}
-            <Card>
-                <CardHeader>
-                    <CardTitle>Ambassador Performance</CardTitle>
-                </CardHeader>
-                <CardContent>
+            <Panel>
+                <PanelTitle
+                    icon={Users}
+                    title="Ambassador performance"
+                    description="Check-ins verified today"
+                />
+                <div className="px-4 pb-4 sm:px-5 sm:pb-5">
                     {data.by_ambassador.length === 0 ? (
-                        <div className="text-center py-8 text-neutral-400 text-sm">
-                            No check-ins yet today
+                        <div className="py-6">
+                            <EmptyState
+                                compact
+                                icon={<Users />}
+                                title="No check-ins yet"
+                                description="Once the team starts scanning, performance will appear here."
+                                className="border-0 bg-transparent py-4"
+                            />
                         </div>
                     ) : (
-                        <div className="space-y-2">
-                            {data.by_ambassador.map((amb, i) => (
-                                <div
-                                    key={amb.verified_by__email}
-                                    className="flex items-center gap-4 p-3 bg-neutral-50 rounded-lg"
+                        <ul className="divide-y divide-border">
+                            {data.by_ambassador.map((ambassador, index) => (
+                                <li
+                                    key={ambassador.verified_by__email}
+                                    className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"
                                 >
-                                    <div className="w-8 h-8 bg-neutral-900 text-white rounded-lg flex items-center justify-center font-bold text-sm">
-                                        {i + 1}
-                                    </div>
-                                    <div className="flex-1">
-                                        <div className="font-medium text-neutral-900">
-                                            {amb.verified_by__full_name || amb.verified_by__email}
+                                    <span
+                                        className={cn(
+                                            'flex size-6 shrink-0 items-center justify-center rounded-md text-[10px] font-semibold tabular-nums',
+                                            index === 0
+                                                ? 'bg-primary text-primary-foreground'
+                                                : 'bg-muted text-muted-foreground'
+                                        )}
+                                    >
+                                        {index + 1}
+                                    </span>
+                                    <Avatar
+                                        name={ambassador.verified_by__full_name}
+                                        seed={ambassador.verified_by__email}
+                                        size="sm"
+                                    />
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex items-baseline justify-between gap-3">
+                                            <p className="truncate text-[12.5px] font-medium">
+                                                {ambassador.verified_by__full_name ||
+                                                    ambassador.verified_by__email}
+                                            </p>
+                                            <span className="shrink-0 text-[12px] font-semibold tabular-nums">
+                                                {formatNumber(ambassador.count)}
+                                            </span>
                                         </div>
-                                        <div className="text-sm text-neutral-500">{amb.verified_by__email}</div>
+                                        <div className="mt-1.5 flex items-center gap-2.5">
+                                            <div className="h-1 flex-1 overflow-hidden rounded-full bg-muted">
+                                                <div
+                                                    className="h-full rounded-full bg-brand/70"
+                                                    style={{
+                                                        width: `${Math.round(
+                                                            (ambassador.count /
+                                                                maxAmbassador) *
+                                                                100
+                                                        )}%`,
+                                                    }}
+                                                />
+                                            </div>
+                                            <span className="hidden w-40 truncate text-[11px] text-muted-foreground sm:block">
+                                                {ambassador.verified_by__email}
+                                            </span>
+                                        </div>
                                     </div>
-                                    <div className="text-right">
-                                        <div className="text-2xl font-bold text-neutral-900">{amb.count}</div>
-                                        <div className="text-xs text-neutral-500">check-ins</div>
-                                    </div>
-                                </div>
+                                </li>
                             ))}
-                        </div>
+                        </ul>
                     )}
-                </CardContent>
-            </Card>
+                </div>
+            </Panel>
+
+            <TodayArrivals eventId={eventId} />
         </div>
+    );
+}
+
+/**
+ * Live feed from the backend's activity log: every accreditation recorded
+ * for this event today, newest first.
+ */
+function TodayArrivals({ eventId }: { eventId: number }) {
+    const { data, loading, error } = useApiQuery<AccreditationLogEntry[]>(
+        `/events/${eventId}/activity-log/`
+    );
+
+    if (loading) return <Skeleton className="h-[180px] rounded-xl" />;
+    if (error) return null;
+
+    const entries = data ?? [];
+    return (
+        <Panel>
+            <PanelTitle
+                icon={TrendingUp}
+                title="Arrivals today"
+                description="Every accreditation recorded today, newest first"
+            />
+            <div className="px-4 pb-4 sm:px-5 sm:pb-5">
+                {entries.length === 0 ? (
+                    <div className="py-6">
+                        <EmptyState
+                            compact
+                            icon={<TrendingUp />}
+                            title="No check-ins today"
+                            description="Arrivals will stream in here as the team accredits guests."
+                            className="border-0 bg-transparent py-4"
+                        />
+                    </div>
+                ) : (
+                    <ul className="divide-y divide-border">
+                        {entries.map((entry) => (
+                            <li
+                                key={entry.id}
+                                className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"
+                            >
+                                <Avatar
+                                    name={entry.guest_name}
+                                    seed={entry.id}
+                                    size="sm"
+                                />
+                                <div className="min-w-0 flex-1">
+                                    <div className="flex items-baseline justify-between gap-3">
+                                        <p className="truncate text-[12.5px] font-medium">
+                                            {entry.guest_name}
+                                        </p>
+                                        <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
+                                            {formatTime(entry.time)}
+                                        </span>
+                                    </div>
+                                    <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                                        {[
+                                            entry.category_name,
+                                            entry.location_name,
+                                            entry.verified_by_name
+                                                ? `by ${entry.verified_by_name}`
+                                                : null,
+                                            entry.kids_count > 0
+                                                ? `${entry.kids_count} kid${entry.kids_count === 1 ? '' : 's'}`
+                                                : null,
+                                        ]
+                                            .filter(Boolean)
+                                            .join(' · ')}
+                                    </p>
+                                </div>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </div>
+        </Panel>
     );
 }

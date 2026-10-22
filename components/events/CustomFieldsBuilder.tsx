@@ -1,10 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+import { ListPlus, Plus, Trash2, X } from 'lucide-react';
+import type { CustomField } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import {
     Select,
@@ -13,15 +14,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Plus, Trash2, GripVertical } from 'lucide-react';
-
-interface CustomField {
-    key: string;
-    label: string;
-    type: string;
-    required: boolean;
-    options?: string[];
-}
+import { cn } from '@/lib/utils';
 
 interface Props {
     schema: { fields: CustomField[] } | null;
@@ -29,185 +22,247 @@ interface Props {
 }
 
 const FIELD_TYPES = [
-    { value: 'text', label: 'Text (short)' },
-    { value: 'textarea', label: 'Textarea (long)' },
+    { value: 'text', label: 'Short text' },
+    { value: 'textarea', label: 'Long text' },
     { value: 'number', label: 'Number' },
     { value: 'date', label: 'Date' },
-    { value: 'dropdown', label: 'Dropdown (single choice)' },
-    { value: 'checkbox', label: 'Checkbox (yes/no)' },
+    { value: 'dropdown', label: 'Dropdown' },
+    { value: 'checkbox', label: 'Yes / no' },
     { value: 'email', label: 'Email' },
     { value: 'phone', label: 'Phone' },
 ];
 
 export function CustomFieldsBuilder({ schema, onChange }: Props) {
-    const [fields, setFields] = useState<CustomField[]>(schema?.fields || []);
+    const [fields, setFields] = useState<CustomField[]>(schema?.fields ?? []);
 
-    const addField = () => {
-        const newField: CustomField = {
-            key: `field_${Date.now()}`,
-            label: '',
-            type: 'text',
-            required: false,
-        };
-        const updated = [...fields, newField];
+    const commit = (updated: CustomField[]) => {
         setFields(updated);
         onChange({ fields: updated });
+    };
+
+    const addField = () => {
+        commit([
+            ...fields,
+            {
+                key: `field_${Date.now()}`,
+                label: '',
+                type: 'text',
+                required: false,
+            },
+        ]);
     };
 
     const removeField = (index: number) => {
-        const updated = fields.filter((_, i) => i !== index);
-        setFields(updated);
-        onChange({ fields: updated });
+        commit(fields.filter((_, itemIndex) => itemIndex !== index));
     };
 
     const updateField = (index: number, updates: Partial<CustomField>) => {
-        const updated = fields.map((f, i) => (i === index ? { ...f, ...updates } : f));
-        setFields(updated);
-        onChange({ fields: updated });
-    };
-
-    const addOption = (fieldIndex: number) => {
-        const field = fields[fieldIndex];
-        const options = [...(field.options || []), ''];
-        updateField(fieldIndex, { options });
+        commit(
+            fields.map((field, itemIndex) =>
+                itemIndex === index ? { ...field, ...updates } : field
+            )
+        );
     };
 
     const updateOption = (fieldIndex: number, optionIndex: number, value: string) => {
-        const field = fields[fieldIndex];
-        const options = [...(field.options || [])];
+        const options = [...(fields[fieldIndex].options ?? [])];
         options[optionIndex] = value;
         updateField(fieldIndex, { options });
     };
 
-    const removeOption = (fieldIndex: number, optionIndex: number) => {
-        const field = fields[fieldIndex];
-        const options = (field.options || []).filter((_, i) => i !== optionIndex);
-        updateField(fieldIndex, { options });
-    };
+    if (fields.length === 0) {
+        return (
+            <div className="flex flex-col items-center rounded-lg border border-dashed border-border px-4 py-8 text-center">
+                <div className="mb-3 flex size-9 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                    <ListPlus className="size-4" />
+                </div>
+                <p className="text-[13px] font-medium">No custom fields</p>
+                <p className="mt-1 max-w-xs text-[12px] text-muted-foreground">
+                    Add fields for things like company, dietary needs, or job title.
+                </p>
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-4"
+                    onClick={addField}
+                >
+                    <Plus className="size-3.5" />
+                    Add field
+                </Button>
+            </div>
+        );
+    }
 
     return (
-        <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                    <CardTitle>Custom Guest Fields</CardTitle>
-                    <p className="text-sm text-neutral-500 mt-1">
-                        Define additional information to collect for each guest
-                    </p>
-                </div>
-                <Button onClick={addField} variant="outline" size="sm">
-                    <Plus className="w-4 h-4 mr-1" /> Add Field
-                </Button>
-            </CardHeader>
-            <CardContent className="space-y-4">
-                {fields.length === 0 ? (
-                    <div className="text-center py-8 text-neutral-400 text-sm">
-                        No custom fields defined. Click "Add Field" to create one.
+        <div className="space-y-2.5">
+            {fields.map((field, index) => (
+                <div
+                    key={index}
+                    className="rounded-lg border border-border/70 bg-muted/30 p-3"
+                >
+                    <div className="mb-2.5 flex items-center justify-between gap-2">
+                        <span className="text-[10px] font-medium tracking-[0.08em] text-muted-foreground uppercase">
+                            Field {index + 1}
+                        </span>
+                        <button
+                            type="button"
+                            onClick={() => removeField(index)}
+                            aria-label={`Remove field ${index + 1}`}
+                            className="flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                        >
+                            <Trash2 className="size-3.5" />
+                        </button>
                     </div>
-                ) : (
-                    fields.map((field, index) => (
-                        <div key={index} className="p-4 bg-neutral-50 rounded-lg space-y-3">
-                            <div className="flex items-start gap-3">
-                                <GripVertical className="w-5 h-5 text-neutral-400 mt-2 cursor-move" />
-                                <div className="flex-1 space-y-3">
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div className="space-y-1">
-                                            <Label className="text-xs">Field Key (no spaces)</Label>
-                                            <Input
-                                                value={field.key}
-                                                onChange={(e) => updateField(index, { key: e.target.value.replace(/\s+/g, '_').toLowerCase() })}
-                                                placeholder="e.g., company_name"
-                                                className="font-mono text-sm"
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <Label className="text-xs">Display Label</Label>
-                                            <Input
-                                                value={field.label}
-                                                onChange={(e) => updateField(index, { label: e.target.value })}
-                                                placeholder="e.g., Company Name"
-                                            />
-                                        </div>
-                                    </div>
 
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div className="space-y-1">
-                                            <Label className="text-xs">Field Type</Label>
-                                            <Select
-                                                value={field.type || 'text'}
-                                                onValueChange={(v) => updateField(index, { type: v || 'text'})}
-                                            >
-                                                <SelectTrigger>
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {FIELD_TYPES.map((t) => (
-                                                        <SelectItem key={t.value} value={t.value}>
-                                                            {t.label}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <Label className="text-xs">Required</Label>
-                                            <div className="flex items-center gap-2 h-9">
-                                                <Switch
-                                                    checked={field.required}
-                                                    onCheckedChange={(v) => updateField(index, { required: v })}
-                                                />
-                                                <span className="text-sm text-neutral-600">
-                                                    {field.required ? 'Yes' : 'No'}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
+                    <div className="grid gap-2.5 sm:grid-cols-2">
+                        <div className="space-y-1.5">
+                            <Label className="text-[11px] text-muted-foreground">
+                                Display label
+                            </Label>
+                            <Input
+                                value={field.label}
+                                onChange={(event) =>
+                                    updateField(index, { label: event.target.value })
+                                }
+                                placeholder="e.g. Company name"
+                                aria-label={`Display label for field ${index + 1}`}
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label className="text-[11px] text-muted-foreground">
+                                Field key
+                            </Label>
+                            <Input
+                                value={field.key}
+                                onChange={(event) =>
+                                    updateField(index, {
+                                        key: event.target.value
+                                            .replace(/\s+/g, '_')
+                                            .toLowerCase(),
+                                    })
+                                }
+                                placeholder="company_name"
+                                aria-label={`Key for field ${index + 1}`}
+                                className="font-mono text-[12px]"
+                            />
+                        </div>
+                    </div>
 
-                                    {/* Options for dropdown */}
-                                    {field.type === 'dropdown' && (
-                                        <div className="space-y-2 pt-2 border-t border-neutral-200">
-                                            <Label className="text-xs">Options</Label>
-                                            {(field.options || []).map((opt, optIdx) => (
-                                                <div key={optIdx} className="flex gap-2">
-                                                    <Input
-                                                        value={opt}
-                                                        onChange={(e) => updateOption(index, optIdx, e.target.value)}
-                                                        placeholder={`Option ${optIdx + 1}`}
-                                                        className="flex-1"
-                                                    />
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        onClick={() => removeOption(index, optIdx)}
-                                                        className="text-red-600 hover:text-red-700"
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </Button>
-                                                </div>
-                                            ))}
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => addOption(index)}
-                                                className="w-full"
-                                            >
-                                                <Plus className="w-3 h-3 mr-1" /> Add Option
-                                            </Button>
-                                        </div>
-                                    )}
-                                </div>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => removeField(index)}
-                                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    <div className="mt-2.5 grid gap-2.5 sm:grid-cols-2">
+                        <div className="space-y-1.5">
+                            <Label className="text-[11px] text-muted-foreground">
+                                Type
+                            </Label>
+                            <Select
+                                value={field.type || 'text'}
+                                onValueChange={(value) =>
+                                    updateField(index, { type: value || 'text' })
+                                }
+                            >
+                                <SelectTrigger
+                                    className="w-full"
+                                    aria-label={`Type for field ${index + 1}`}
                                 >
-                                    <Trash2 className="w-4 h-4" />
-                                </Button>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {FIELD_TYPES.map((type) => (
+                                        <SelectItem key={type.value} value={type.value}>
+                                            {type.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label className="text-[11px] text-muted-foreground">
+                                Required
+                            </Label>
+                            <div
+                                className={cn(
+                                    'flex h-10 items-center gap-2.5 rounded-lg border border-border bg-card px-3'
+                                )}
+                            >
+                                <Switch
+                                    checked={field.required}
+                                    onCheckedChange={(checked) =>
+                                        updateField(index, { required: checked })
+                                    }
+                                    aria-label={`Field ${index + 1} required`}
+                                />
+                                <span className="text-[12px] text-muted-foreground">
+                                    {field.required ? 'Required' : 'Optional'}
+                                </span>
                             </div>
                         </div>
-                    ))
-                )}
-            </CardContent>
-        </Card>
+                    </div>
+
+                    {field.type === 'dropdown' ? (
+                        <div className="mt-3 space-y-2 border-t border-border/70 pt-3">
+                            <Label className="text-[11px] text-muted-foreground">
+                                Options
+                            </Label>
+                            {(field.options ?? []).map((option, optionIndex) => (
+                                <div key={optionIndex} className="flex gap-2">
+                                    <Input
+                                        value={option}
+                                        onChange={(event) =>
+                                            updateOption(
+                                                index,
+                                                optionIndex,
+                                                event.target.value
+                                            )
+                                        }
+                                        placeholder={`Option ${optionIndex + 1}`}
+                                        aria-label={`Option ${optionIndex + 1}`}
+                                        className="h-9"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            updateField(index, {
+                                                options: (field.options ?? []).filter(
+                                                    (_, itemIndex) =>
+                                                        itemIndex !== optionIndex
+                                                ),
+                                            })
+                                        }
+                                        aria-label={`Remove option ${optionIndex + 1}`}
+                                        className="flex size-9 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                                    >
+                                        <X className="size-3.5" />
+                                    </button>
+                                </div>
+                            ))}
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="w-full border-dashed"
+                                onClick={() =>
+                                    updateField(index, {
+                                        options: [...(field.options ?? []), ''],
+                                    })
+                                }
+                            >
+                                <Plus className="size-3.5" />
+                                Add option
+                            </Button>
+                        </div>
+                    ) : null}
+                </div>
+            ))}
+
+            <Button
+                type="button"
+                variant="outline"
+                className="w-full border-dashed"
+                onClick={addField}
+            >
+                <Plus className="size-3.5" />
+                Add another field
+            </Button>
+        </div>
     );
 }

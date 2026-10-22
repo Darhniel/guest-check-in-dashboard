@@ -1,6 +1,16 @@
 'use client';
 
 import { useState } from 'react';
+import {
+    AlertCircle,
+    Check,
+    CheckCircle2,
+    Copy,
+    Eye,
+    EyeOff,
+    Loader2,
+    Wand2,
+} from 'lucide-react';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,10 +19,11 @@ import {
     Dialog,
     DialogContent,
     DialogDescription,
+    DialogFooter,
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { Loader2, Copy, Check } from 'lucide-react';
+import { toast } from '@/components/ui/toast';
 
 interface Props {
     open: boolean;
@@ -20,48 +31,70 @@ interface Props {
     onSuccess: () => void;
 }
 
-export function AmbassadorCreateDialog({ open, onOpenChange, onSuccess }: Props) {
+function generatePassword() {
+    const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$';
+    let password = '';
+    for (let i = 0; i < 12; i += 1) {
+        password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return password;
+}
+
+/**
+ * Lives inside `DialogContent`, so it is thrown away every time the dialog
+ * closes. That gives us a clean form on open without a reset effect.
+ */
+function CreateAmbassadorForm({
+    onDone,
+    onSuccess,
+}: {
+    onDone: () => void;
+    onSuccess: () => void;
+}) {
     const [fullName, setFullName] = useState('');
     const [email, setEmail] = useState('');
     const [phone, setPhone] = useState('');
-    const [password, setPassword] = useState('');
+    const [password, setPassword] = useState(generatePassword);
+    const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
-    const [created, setCreated] = useState<{ email: string; password: string } | null>(null);
+    const [created, setCreated] = useState<{ email: string; password: string } | null>(
+        null
+    );
     const [copied, setCopied] = useState(false);
 
-    const generatePassword = () => {
-        const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$';
-        let pass = '';
-        for (let i = 0; i < 12; i++) {
-            pass += chars.charAt(Math.floor(Math.random() * chars.length));
-        }
-        setPassword(pass);
-    };
+    const handleCreate = async (event: React.FormEvent) => {
+        event.preventDefault();
+        setError('');
 
-    const handleCreate = async () => {
-        if (!fullName || !email || !password) {
-            setError('Please fill in all required fields');
+        if (!fullName.trim() || !email.trim() || !password) {
+            setError('Name, email, and a temporary password are required.');
             return;
         }
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+            setError('Enter a valid email address.');
+            return;
+        }
+
         setLoading(true);
-        setError('');
 
         try {
             await api('/admin/ambassadors/', {
                 method: 'POST',
                 body: JSON.stringify({
-                    full_name: fullName,
-                    email,
-                    phone,
+                    full_name: fullName.trim(),
+                    email: email.trim(),
+                    phone: phone.trim(),
                     password,
                     role: 'ambassador',
                 }),
             });
-            setCreated({ email, password });
+            setCreated({ email: email.trim(), password });
             onSuccess();
-        } catch (err: any) {
-            setError(err.message || 'Failed to create ambassador');
+        } catch (err) {
+            setError(
+                err instanceof Error ? err.message : 'Failed to create ambassador.'
+            );
         } finally {
             setLoading(false);
         }
@@ -69,139 +102,221 @@ export function AmbassadorCreateDialog({ open, onOpenChange, onSuccess }: Props)
 
     const handleCopy = async () => {
         if (!created) return;
-        const text = `Login: ${created.email}\nPassword: ${created.password}`;
-        await navigator.clipboard.writeText(text);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+        try {
+            await navigator.clipboard.writeText(
+                `Email: ${created.email}\nPassword: ${created.password}`
+            );
+            setCopied(true);
+            toast.add({
+                type: 'success',
+                title: 'Credentials copied',
+                description: 'Share them with the ambassador over a secure channel.',
+            });
+            setTimeout(() => setCopied(false), 2000);
+        } catch {
+            toast.add({
+                type: 'error',
+                title: 'Could not copy',
+                description: 'Select the credentials and copy them manually.',
+            });
+        }
     };
 
-    const handleClose = () => {
-        onOpenChange(false);
-        setFullName('');
-        setEmail('');
-        setPhone('');
-        setPassword('');
-        setError('');
-        setCreated(null);
-    };
+    if (created) {
+        return (
+            <>
+                <DialogHeader>
+                    <div className="mb-1 flex size-10 items-center justify-center rounded-full bg-success-subtle text-success">
+                        <CheckCircle2 className="size-5" />
+                    </div>
+                    <DialogTitle>Ambassador created</DialogTitle>
+                    <DialogDescription>
+                        Share these credentials securely. The password won&apos;t be
+                        shown again.
+                    </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-3 rounded-xl border border-border bg-muted/40 p-4">
+                    <div>
+                        <p className="text-[10px] font-medium tracking-[0.09em] text-muted-foreground uppercase">
+                            Email
+                        </p>
+                        <p className="mt-1 font-mono text-[13px] break-all">
+                            {created.email}
+                        </p>
+                    </div>
+                    <div className="border-t border-border pt-3">
+                        <p className="text-[10px] font-medium tracking-[0.09em] text-muted-foreground uppercase">
+                            Temporary password
+                        </p>
+                        <p className="mt-1 rounded-lg border border-border bg-card px-3 py-2 font-mono text-[13px] tracking-wide">
+                            {created.password}
+                        </p>
+                    </div>
+                </div>
+
+                <p className="text-[12px] text-muted-foreground">
+                    They&apos;ll be asked to choose a new password on first sign-in.
+                </p>
+
+                <DialogFooter>
+                    <Button variant="outline" onClick={handleCopy}>
+                        {copied ? (
+                            <Check className="size-4 text-success" />
+                        ) : (
+                            <Copy className="size-4" />
+                        )}
+                        {copied ? 'Copied' : 'Copy credentials'}
+                    </Button>
+                    <Button onClick={onDone}>Done</Button>
+                </DialogFooter>
+            </>
+        );
+    }
 
     return (
-        <Dialog open={open} onOpenChange={handleClose}>
-            <DialogContent className="max-w-md">
-                {!created ? (
-                    <>
-                        <DialogHeader>
-                            <DialogTitle>Create Ambassador</DialogTitle>
-                            <DialogDescription>
-                                Create a new brand ambassador account. Share the credentials securely.
-                            </DialogDescription>
-                        </DialogHeader>
+        <form onSubmit={handleCreate} className="space-y-5">
+            <DialogHeader>
+                <DialogTitle>Create ambassador</DialogTitle>
+                <DialogDescription>
+                    Give someone access to scan and accredit guests at assigned
+                    events.
+                </DialogDescription>
+            </DialogHeader>
 
-                        <div className="space-y-4 py-4">
-                            <div className="space-y-2">
-                                <Label>Full Name *</Label>
-                                <Input
-                                    placeholder="Sarah Johnson"
-                                    value={fullName}
-                                    onChange={(e) => setFullName(e.target.value)}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label>Email *</Label>
-                                <Input
-                                    type="email"
-                                    placeholder="sarah@company.com"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label>Phone</Label>
-                                <Input
-                                    placeholder="+234 800 000 0000"
-                                    value={phone}
-                                    onChange={(e) => setPhone(e.target.value)}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label>Temporary Password *</Label>
-                                <div className="flex gap-2">
-                                    <Input
-                                        type="text"
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        placeholder="Auto-generated or type manually"
-                                        className="font-mono"
-                                    />
-                                    <Button type="button" variant="outline" onClick={generatePassword}>
-                                        Generate
-                                    </Button>
-                                </div>
-                                <p className="text-xs text-neutral-500">
-                                    The ambassador will be required to change this on first login.
-                                </p>
-                            </div>
+            <div className="space-y-4">
+                <div className="space-y-1.5">
+                    <Label htmlFor="ambassador-name">
+                        Full name
+                        <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                        id="ambassador-name"
+                        value={fullName}
+                        onChange={(event) => setFullName(event.target.value)}
+                        placeholder="Sarah Johnson"
+                        autoComplete="name"
+                        autoFocus
+                    />
+                </div>
 
-                            {error && (
-                                <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-3">
-                                    {error}
-                                </div>
-                            )}
+                <div className="space-y-1.5">
+                    <Label htmlFor="ambassador-email">
+                        Email
+                        <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                        id="ambassador-email"
+                        type="email"
+                        value={email}
+                        onChange={(event) => setEmail(event.target.value)}
+                        placeholder="sarah@company.com"
+                        autoComplete="email"
+                    />
+                </div>
 
-                            <div className="flex gap-2 pt-2">
-                                <Button variant="outline" onClick={handleClose} className="flex-1">
-                                    Cancel
-                                </Button>
-                                <Button onClick={handleCreate} disabled={loading} className="flex-1">
-                                    {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                                    Create
-                                </Button>
-                            </div>
-                        </div>
-                    </>
-                ) : (
-                    <>
-                        <DialogHeader>
-                            <DialogTitle className="text-green-700">✓ Ambassador Created</DialogTitle>
-                            <DialogDescription>
-                                Share these credentials with the ambassador securely.
-                            </DialogDescription>
-                        </DialogHeader>
+                <div className="space-y-1.5">
+                    <Label htmlFor="ambassador-phone">
+                        Phone
+                        <span className="text-[11px] font-normal text-muted-foreground">
+                            Optional
+                        </span>
+                    </Label>
+                    <Input
+                        id="ambassador-phone"
+                        type="tel"
+                        value={phone}
+                        onChange={(event) => setPhone(event.target.value)}
+                        placeholder="+234 800 000 0000"
+                        autoComplete="tel"
+                    />
+                </div>
 
-                        <div className="space-y-4 py-4">
-                            <div className="bg-neutral-50 border border-neutral-200 rounded-lg p-4 space-y-3">
-                                <div>
-                                    <div className="text-xs text-neutral-500 mb-1">Email</div>
-                                    <div className="font-mono text-sm text-neutral-900">{created.email}</div>
-                                </div>
-                                <div>
-                                    <div className="text-xs text-neutral-500 mb-1">Temporary Password</div>
-                                    <div className="font-mono text-sm text-neutral-900 bg-white px-3 py-2 rounded border border-neutral-200">
-                                        {created.password}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <Button onClick={handleCopy} variant="outline" className="w-full">
-                                {copied ? (
-                                    <>
-                                        <Check className="w-4 h-4 mr-2 text-green-600" />
-                                        Copied to Clipboard
-                                    </>
+                <div className="space-y-1.5">
+                    <Label htmlFor="ambassador-password">
+                        Temporary password
+                        <span className="text-destructive">*</span>
+                    </Label>
+                    <div className="flex gap-2">
+                        <div className="relative min-w-0 flex-1">
+                            <Input
+                                id="ambassador-password"
+                                type={showPassword ? 'text' : 'password'}
+                                value={password}
+                                onChange={(event) => setPassword(event.target.value)}
+                                className="pr-9 font-mono text-[13px]"
+                                autoComplete="new-password"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword((prev) => !prev)}
+                                aria-label={
+                                    showPassword ? 'Hide password' : 'Show password'
+                                }
+                                className="absolute top-1/2 right-1.5 flex size-7 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                            >
+                                {showPassword ? (
+                                    <EyeOff className="size-3.5" />
                                 ) : (
-                                    <>
-                                        <Copy className="w-4 h-4 mr-2" />
-                                        Copy Credentials
-                                    </>
+                                    <Eye className="size-3.5" />
                                 )}
-                            </Button>
-
-                            <Button onClick={handleClose} className="w-full">
-                                Done
-                            </Button>
+                            </button>
                         </div>
-                    </>
-                )}
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => {
+                                setPassword(generatePassword());
+                                setShowPassword(true);
+                            }}
+                            aria-label="Generate a new password"
+                        >
+                            <Wand2 className="size-4" />
+                            <span className="max-sm:sr-only">Generate</span>
+                        </Button>
+                    </div>
+                    <p className="text-[11.5px] text-muted-foreground">
+                        They&apos;ll be prompted to change this on first sign-in.
+                    </p>
+                </div>
+
+                {error ? (
+                    <div
+                        role="alert"
+                        className="flex items-start gap-2 rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2.5 text-[12.5px] text-destructive"
+                    >
+                        <AlertCircle className="mt-0.5 size-3.5 shrink-0" />
+                        {error}
+                    </div>
+                ) : null}
+            </div>
+
+            <DialogFooter>
+                <Button
+                    type="button"
+                    variant="outline"
+                    onClick={onDone}
+                    disabled={loading}
+                >
+                    Cancel
+                </Button>
+                <Button type="submit" disabled={loading}>
+                    {loading ? <Loader2 className="size-4 animate-spin" /> : null}
+                    Create ambassador
+                </Button>
+            </DialogFooter>
+        </form>
+    );
+}
+
+export function AmbassadorCreateDialog({ open, onOpenChange, onSuccess }: Props) {
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-md">
+                <CreateAmbassadorForm
+                    onDone={() => onOpenChange(false)}
+                    onSuccess={onSuccess}
+                />
             </DialogContent>
         </Dialog>
     );

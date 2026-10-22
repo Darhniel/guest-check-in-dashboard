@@ -1,32 +1,127 @@
-import { LucideIcon } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+const tones = {
+    brand: 'bg-brand-subtle text-brand',
+    success: 'bg-success-subtle text-success',
+    warning: 'bg-warning-subtle text-warning',
+    info: 'bg-info-subtle text-info',
+    neutral: 'bg-muted text-muted-foreground',
+};
+
+const labelClass =
+    'text-[10px] font-medium tracking-[0.09em] text-muted-foreground uppercase sm:text-[11px]';
 
 interface StatsCardProps {
     label: string;
     value: string | number;
     icon: LucideIcon;
-    trend?: string;
-    accent?: 'neutral' | 'blue' | 'green' | 'amber';
+    hint?: string;
+    tone?: keyof typeof tones;
+    sparkline?: number[];
 }
 
-const accents = {
-    neutral: 'bg-neutral-100 text-neutral-700',
-    blue: 'bg-blue-100 text-blue-700',
-    green: 'bg-green-100 text-green-700',
-    amber: 'bg-amber-100 text-amber-700',
-};
-
-export function StatsCard({ label, value, icon: Icon, trend, accent = 'neutral' }: StatsCardProps) {
+function IconChip({
+    icon: Icon,
+    tone,
+    className,
+}: {
+    icon: LucideIcon;
+    tone: keyof typeof tones;
+    className?: string;
+}) {
     return (
-        <div className="bg-white border border-neutral-200 rounded-xl p-5">
-            <div className="flex items-start justify-between">
-                <div>
-                    <div className="text-sm text-neutral-500 font-medium">{label}</div>
-                    <div className="text-3xl font-bold text-neutral-900 mt-2">{value}</div>
-                    {trend && <div className="text-xs text-neutral-500 mt-1">{trend}</div>}
+        <span
+            className={cn(
+                'flex size-8 shrink-0 items-center justify-center rounded-lg transition-transform duration-300 ease-snappy group-hover:-translate-y-0.5 sm:size-9',
+                tones[tone],
+                className
+            )}
+        >
+            <Icon className="size-4" strokeWidth={1.9} />
+        </span>
+    );
+}
+
+function Sparkline({ data }: { data: number[] }) {
+    if (data.length < 2) return null;
+    const max = Math.max(...data);
+    const min = Math.min(...data);
+    const range = max - min || 1;
+    const points = data
+        .map((value, index) => {
+            const x = (index / (data.length - 1)) * 100;
+            const y = 26 - ((value - min) / range) * 20;
+            return `${x.toFixed(2)},${y.toFixed(2)}`;
+        })
+        .join(' ');
+
+    return (
+        <svg
+            aria-hidden="true"
+            viewBox="0 0 100 30"
+            preserveAspectRatio="none"
+            className="h-7 w-20 text-brand/50"
+        >
+            <polyline
+                points={points}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.75}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                vectorEffect="non-scaling-stroke"
+            />
+        </svg>
+    );
+}
+
+export function StatsCard({
+    label,
+    value,
+    icon: Icon,
+    hint,
+    tone = 'neutral',
+    sparkline,
+}: StatsCardProps) {
+    return (
+        <div className="group relative overflow-hidden rounded-xl bg-card shadow-card ring-1 ring-border transition-[box-shadow,background-color] duration-200 hover:shadow-[0_2px_8px_-2px_oklch(0.2_0.02_270/0.08)]">
+            {/* Mobile: compact list row */}
+            <div className="flex items-center gap-3 p-3.5 sm:hidden">
+                <IconChip icon={Icon} tone={tone} className="size-9" />
+                <div className="min-w-0 flex-1">
+                    <p className={labelClass}>{label}</p>
+                    {hint ? (
+                        <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                            {hint}
+                        </p>
+                    ) : null}
                 </div>
-                <div className={cn('w-10 h-10 rounded-lg flex items-center justify-center', accents[accent])}>
-                    <Icon className="w-5 h-5" />
+                <p className="pl-1 text-[22px] leading-none font-semibold tracking-[-0.03em] tabular-nums">
+                    {value}
+                </p>
+            </div>
+
+            {/* Desktop: stat card */}
+            <div className="hidden flex-col justify-between gap-4 p-5 sm:flex">
+                <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                        <p className={labelClass}>{label}</p>
+                        <p className="mt-2.5 text-[30px] leading-none font-semibold tracking-[-0.03em] tabular-nums">
+                            {value}
+                        </p>
+                    </div>
+                    <IconChip icon={Icon} tone={tone} />
+                </div>
+                <div className="flex min-h-7 items-end justify-between gap-2">
+                    {hint ? (
+                        <p className="text-[11px] leading-tight text-muted-foreground">
+                            {hint}
+                        </p>
+                    ) : (
+                        <span />
+                    )}
+                    {sparkline ? <Sparkline data={sparkline} /> : null}
                 </div>
             </div>
         </div>

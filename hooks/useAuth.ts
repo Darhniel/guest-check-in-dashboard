@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { getUser, isAuthenticated, isAdmin } from '@/lib/auth';
+import { getUser, isAuthenticated } from '@/lib/auth';
 import { User } from '@/types';
+
+type AuthState = { user: User | null; loading: boolean };
 
 export const useAuth = (requireAdmin = true) => {
     const router = useRouter();
-    const [user, setUser] = useState<User | null>(null);
-    const [loading, setLoading] = useState(true);
+    const [state, setState] = useState<AuthState>({ user: null, loading: true });
 
     useEffect(() => {
         if (!isAuthenticated()) {
@@ -16,15 +17,16 @@ export const useAuth = (requireAdmin = true) => {
             return;
         }
 
-        const u = getUser();
-        if (requireAdmin && u?.role !== 'admin') {
+        const user = getUser();
+        if (requireAdmin && user?.role !== 'admin') {
             router.replace('/login');
             return;
         }
 
-        setUser(u);
-        setLoading(false);
+        // The session lives in localStorage, which is only readable after mount.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setState({ user, loading: false });
     }, [router, requireAdmin]);
 
-    return { user, loading };
+    return state;
 };
