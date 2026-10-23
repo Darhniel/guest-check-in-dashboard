@@ -41,6 +41,22 @@ export const isAdmin = (): boolean => {
     return user?.role === 'admin';
 };
 
+/**
+ * True when the stored access token carries a past `exp`. Malformed tokens are
+ * left to the server-side 401 path — the client cannot be sure.
+ */
+export const isAccessTokenExpired = (): boolean => {
+    const token = getAccessToken();
+    if (!token) return true;
+    try {
+        const payload = JSON.parse(atob(token.split('.')[1])) as { exp?: number };
+        if (!payload.exp) return false;
+        return payload.exp * 1000 <= Date.now();
+    } catch {
+        return false;
+    }
+};
+
 export const isDemoMode = DEMO_MODE;
 
 /**

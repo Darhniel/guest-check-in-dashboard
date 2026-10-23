@@ -10,6 +10,7 @@ const nextConfig: NextConfig = {
       validationLevel: "manual-warning",
     },
   },
+  allowedDevOrigins: ['192.168.43.198'],
   cacheComponents: true,
   partialPrefetching: true,
   turbopack: {

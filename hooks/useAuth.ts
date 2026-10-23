@@ -2,7 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { getUser, isAuthenticated } from '@/lib/auth';
+import {
+    getRefreshToken,
+    getUser,
+    isAuthenticated,
+    isAccessTokenExpired,
+    logout,
+} from '@/lib/auth';
 import { User } from '@/types';
 
 type AuthState = { user: User | null; loading: boolean };
@@ -12,8 +18,10 @@ export const useAuth = (requireAdmin = true) => {
     const [state, setState] = useState<AuthState>({ user: null, loading: true });
 
     useEffect(() => {
-        if (!isAuthenticated()) {
-            router.replace('/login');
+        // Bail out immediately when the session cannot possibly recover, so a
+        // dead profile lands on /login without waiting for a network 401.
+        if (!isAuthenticated() || (isAccessTokenExpired() && !getRefreshToken())) {
+            logout();
             return;
         }
 
