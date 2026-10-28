@@ -17,7 +17,7 @@ npm run build
 
 echo "🔄 Restarting the Next.js server..."
 # OPTION A: If you are using PM2 (Recommended for production)
-pm2 restart guest-accreditaion-dashboard
+pm2 restart guest-accreditation-dashboard
 # Replace 'nextjs-app' with whatever name you gave your PM2 process
 
 echo "✅ Deployment complete!"
