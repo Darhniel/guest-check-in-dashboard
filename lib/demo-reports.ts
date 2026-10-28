@@ -61,6 +61,152 @@ interface CheckinRecord {
 
 const reportCache = new Map<string, EventReport>();
 
+/** Guests imported through the demo CSV flow, keyed by event. */
+const importedGuests = new Map<number, ReportGuest[]>();
+
+export interface DemoGuestInput {
+    names?: string;
+    /** @deprecated accepted so older demo payloads keep working. */
+    adult_names?: string;
+    email?: string;
+    phone?: string;
+    category_name?: string;
+    spouse_name?: string;
+    nanny_name?: string;
+    nanny_count?: number;
+    allergies?: string;
+    kids?: { name?: string; age?: number | string; gender?: string }[];
+}
+
+/** Shared row builder for the demo import and manual-entry flows. */
+function buildDemoGuest(
+    event: Event,
+    guest: DemoGuestInput,
+    index: number
+): ReportGuest | null {
+    const name = (guest.names ?? guest.adult_names ?? '').trim();
+    if (!name) return null;
+
+    const email = (guest.email ?? '').trim();
+    const phone = (guest.phone ?? '').trim();
+    // Name plus email or phone is the same rule the API enforces.
+    if (!email && !phone) return null;
+
+    const requested = (guest.category_name ?? '').trim().toLowerCase();
+    const category = requested
+        ? event.categories.find((item) => item.name.toLowerCase() === requested)
+        : undefined;
+
+    return {
+        id: event.id * 10000 + 90000 + index + 1,
+        ticket_number: `EVT-${event.id}-IMP${String(index + 1).padStart(4, '0')}`,
+        names: name,
+        email,
+        phone,
+        category: category?.name ?? null,
+        category_color: category?.color ?? null,
+        kids_count: Array.isArray(guest.kids)
+            ? guest.kids.filter((kid) => kid?.name && Number(kid?.age) > 0).length
+            : 0,
+        custom_data: {},
+        checked_in: false,
+        checkins: 0,
+        first_checkin_date: null,
+        last_checkin_date: null,
+        last_checkin_time: null,
+        location: null,
+    };
+}
+
+function isDemoDuplicate(existing: ReportGuest[], guest: DemoGuestInput) {
+    const name = (guest.names ?? guest.adult_names ?? '').trim();
+    const email = (guest.email ?? '').trim();
+    return existing.some((item) =>
+        email
+            ? item.email.toLowerCase() === email.toLowerCase()
+            : item.names.toLowerCase() === name.toLowerCase()
+    );
+}
+
+/**
+ * Demo equivalent of POST /admin/events/<id>/guests/bulk/ — mirrors the
+ * backend's dedupe and name-plus-contact rules so the preview behaves like
+ * production.
+ */
+export function addDemoImportedGuests(
+    event: Event,
+    guests: DemoGuestInput[]
+): number {
+    const existing = importedGuests.get(event.id) ?? [];
+    let added = 0;
+
+    for (const guest of guests) {
+        const row = buildDemoGuest(event, guest, existing.length);
+        if (!row || isDemoDuplicate(existing, guest)) continue;
+        existing.push(row);
+        added += 1;
+    }
+
+    importedGuests.set(event.id, existing);
+    return added;
+}
+
+/**
+ * Demo equivalent of POST /admin/events/<id>/guests/ — adds one manually
+ * entered guest and returns the shape the real endpoint responds with.
+ */
+export function addDemoSingleGuest(event: Event, guest: DemoGuestInput) {
+    const existing = importedGuests.get(event.id) ?? [];
+    const name = (guest.names ?? guest.adult_names ?? '').trim();
+    const email = (guest.email ?? '').trim();
+    const phone = (guest.phone ?? '').trim();
+
+    if (!name) {
+        throw new Error('Names: At least one guest name is required.');
+    }
+    if (!email && !phone) {
+        throw new Error('Email: Provide an email address or a phone number.');
+    }
+    if (isDemoDuplicate(existing, guest)) {
+        throw new Error(
+            email
+                ? 'A guest with this email address is already on this event.'
+                : 'A guest with this name (and no email) is already on this event.'
+        );
+    }
+
+    const row = buildDemoGuest(event, guest, existing.length);
+    if (!row) throw new Error('We could not add that guest.');
+
+    existing.push(row);
+    importedGuests.set(event.id, existing);
+
+    return {
+        message: 'Guest added.',
+        id: row.id,
+        names: row.names,
+        adult_names: row.names,
+        spouse_name: (guest.spouse_name ?? '').trim(),
+        email: row.email,
+        phone: row.phone,
+        nanny_name: (guest.nanny_name ?? '').trim(),
+        nanny_count: Math.max(0, Number(guest.nanny_count) || 0),
+        allergies: (guest.allergies ?? '').trim(),
+        category_name: row.category,
+        kids: (guest.kids ?? [])
+            .filter((kid) => kid?.name && Number(kid?.age) >= 0)
+            .map((kid, index) => ({
+                id: index + 1,
+                name: String(kid.name).trim(),
+                age: Number(kid.age),
+                gender: kid.gender ?? '',
+            })),
+        ticket_number: row.ticket_number,
+        custom_data: {},
+        is_checked_in_today: false,
+    };
+}
+
 export function clearDemoReportCache() {
     reportCache.clear();
 }
@@ -261,7 +407,9 @@ function buildReport(
 ): EventReport {
     const key = `${event.id}|${event.start_date}|${event.end_date}|${
         event.categories.length
-    }|${(assignments[event.id] ?? []).join(',')}`;
+    }|${(assignments[event.id] ?? []).join(',')}|${
+        (importedGuests.get(event.id) ?? []).length
+    }`;
     const cached = reportCache.get(key);
     if (cached) return cached;
 
@@ -289,7 +437,7 @@ function buildReport(
         guests.push({
             id: event.id * 10000 + index + 1,
             ticket_number: `EVT-${event.id}-${String(index + 1).padStart(5, '0')}`,
-            adult_names: name.full,
+            names: name.full,
             email: `${name.first}.${name.last}${index + 1}@example.com`.toLowerCase(),
             phone: `+234 80${String((index * 37) % 10)} ${String(
                 100 + ((index * 13) % 900)
@@ -312,6 +460,11 @@ function buildReport(
             location: last?.location ?? null,
         });
     }
+
+    // Guests uploaded through the demo CSV importer sit alongside the
+    // generated ones, so the register and totals stay consistent.
+    const imported = importedGuests.get(event.id) ?? [];
+    if (imported.length > 0) guests.push(...imported);
 
     const categoryStats = new Map<
         string,
@@ -432,7 +585,7 @@ function buildReport(
         .map((record) => {
             const guest = guests[record.guestIndex];
             return {
-                guest_name: guest?.adult_names ?? 'Guest',
+                guest_name: guest?.names ?? 'Guest',
                 category: guest?.category ?? null,
                 location: record.location,
                 ambassador: record.ambassador?.full_name ?? null,

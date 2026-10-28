@@ -51,7 +51,7 @@ export function GuestTable({ guests }: { guests: ReportGuest[] }) {
             if (!query) return true;
 
             return (
-                guest.adult_names.toLowerCase().includes(query) ||
+                guest.names.toLowerCase().includes(query) ||
                 guest.email.toLowerCase().includes(query) ||
                 guest.ticket_number.toLowerCase().includes(query) ||
                 (guest.category ?? '').toLowerCase().includes(query)
@@ -169,14 +169,14 @@ export function GuestTable({ guests }: { guests: ReportGuest[] }) {
                             className="flex items-center gap-3 px-4 py-2.5 sm:px-5"
                         >
                             <Avatar
-                                name={guest.adult_names}
+                                name={guest.names}
                                 seed={guest.email || guest.ticket_number}
                                 size="sm"
                             />
                             <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2">
                                     <p className="truncate text-[12.5px] font-medium">
-                                        {guest.adult_names}
+                                        {guest.names}
                                     </p>
                                     {guest.kids_count > 0 ? (
                                         <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[9.5px] text-muted-foreground">

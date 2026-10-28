@@ -235,7 +235,7 @@ function guestSheet(report: EventReport): Sheet<Blob> {
         ...report.guests.map((guest) =>
             cells([
                 guest.ticket_number,
-                guest.adult_names,
+                guest.names,
                 guest.category ?? 'Uncategorized',
                 guest.email,
                 guest.phone,

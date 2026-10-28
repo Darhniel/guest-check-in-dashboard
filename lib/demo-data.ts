@@ -10,10 +10,13 @@ import type {
     User,
 } from '@/types';
 import {
+    addDemoImportedGuests,
+    addDemoSingleGuest,
     buildDemoEventReport,
     buildDemoReports,
     clearDemoReportCache,
 } from '@/lib/demo-reports';
+import type { DemoGuestInput } from '@/lib/demo-reports';
 
 export const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
 
@@ -512,6 +515,43 @@ export async function demoRequest<T>(
         );
         clearDemoReportCache();
         return updated as T;
+    }
+
+    const createGuestMatch = path.match(/^\/admin\/events\/(\d+)\/guests\/?$/);
+    if (method === 'POST' && createGuestMatch) {
+        const event = demoEvents.find(
+            (item) => item.id === Number(createGuestMatch[1])
+        );
+        if (!event) throw new Error('Event not found');
+
+        const body = jsonBody<DemoGuestInput>(options);
+        const guest = addDemoSingleGuest(event, body);
+        clearDemoReportCache();
+        return guest as T;
+    }
+
+    const bulkGuestsMatch = path.match(/^\/admin\/events\/(\d+)\/guests\/bulk\/?$/);
+    if (method === 'POST' && bulkGuestsMatch) {
+        const event = demoEvents.find(
+            (item) => item.id === Number(bulkGuestsMatch[1])
+        );
+        if (!event) throw new Error('Event not found');
+
+        const body = jsonBody<{ guests?: DemoGuestInput[] }>(options);
+        const guests = body.guests ?? [];
+        if (guests.length === 0) {
+            throw new Error('Provide a non-empty list of guests.');
+        }
+
+        const created = addDemoImportedGuests(event, guests);
+        clearDemoReportCache();
+        return {
+            message: `Processed ${guests.length} guests. Created ${created} new records.`,
+            created_count: created,
+            skipped_count: guests.length - created,
+            created_categories: [],
+            errors: null,
+        } as T;
     }
 
     const analyticsMatch = path.match(/^\/admin\/events\/(\d+)\/analytics\/?$/);

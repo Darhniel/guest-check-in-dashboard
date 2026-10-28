@@ -71,9 +71,64 @@ export interface OrganizerApiKey {
     last_used: string | null;
 }
 
-export interface OrganizerApiKeyCreateResponse extends OrganizerApiKey {
+export interface OrganizerApiKeyCreateResponse {
+    id: number;
+    organizer_name: string;
+    key_prefix: string;
     /** Returned once, immediately after creation. Never sent again. */
     api_key: string;
+    /** The live API omits these on create; demo mode includes them. */
+    is_active?: boolean;
+    created_at?: string;
+    last_used?: string | null;
+}
+
+export interface GuestImportResponse {
+    message: string;
+    created_count: number;
+    skipped_count: number;
+    created_categories: string[];
+    errors: { index: number; error: string; guest: string }[] | null;
+}
+
+export interface GuestCreateKidInput {
+    name: string;
+    age: number;
+    gender?: string;
+}
+
+/** Body accepted by POST /admin/events/<id>/guests/ (manual entry form). */
+export interface GuestCreateInput {
+    names: string;
+    email?: string;
+    phone?: string;
+    category_name?: string;
+    spouse_name?: string;
+    nanny_name?: string;
+    nanny_count?: number;
+    allergies?: string;
+    custom_data?: Record<string, unknown>;
+    kids?: GuestCreateKidInput[];
+}
+
+/** The created guest, as returned by the manual-entry endpoint. */
+export interface GuestCreateResponse {
+    message?: string;
+    id: number;
+    names: string;
+    /** @deprecated alias the API still emits during the rename; use `names`. */
+    adult_names?: string;
+    spouse_name: string;
+    email: string;
+    phone: string;
+    nanny_name: string;
+    nanny_count: number;
+    allergies: string;
+    category_name: string | null;
+    kids: { id: number; name: string; age: number; gender: string }[];
+    ticket_number: string;
+    custom_data: Record<string, unknown>;
+    is_checked_in_today: boolean;
 }
 
 export interface EventAnalytics {
@@ -148,7 +203,9 @@ export interface ReportRecentCheckin {
 export interface ReportGuest {
     id: number;
     ticket_number: string;
-    adult_names: string;
+    names: string;
+    /** @deprecated alias the API still emits during the rename; use `names`. */
+    adult_names?: string;
     email: string;
     phone: string;
     category: string | null;

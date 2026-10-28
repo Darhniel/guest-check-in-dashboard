@@ -110,7 +110,7 @@ function requestExample(eventId: number) {
   -d '{
     "guests": [
       {
-        "adult_names": "Ada Obi",
+        "names": "Ada Obi",
         "email": "ada@example.com",
         "phone": "+234 801 234 5678",
         "category_name": "VIP",

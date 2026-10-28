@@ -1,6 +1,7 @@
 'use client';
 
-import { FileText, Users } from 'lucide-react';
+import { useState } from 'react';
+import { FileText, Upload, UserPlus, Users } from 'lucide-react';
 import Link from 'next/link';
 import type { EventReport } from '@/types';
 import { useApiQuery } from '@/hooks/useApi';
@@ -9,6 +10,8 @@ import { EmptyState } from '@/components/common/EmptyState';
 import { ErrorState } from '@/components/common/ErrorState';
 import { Skeleton } from '@/components/common/Skeleton';
 import { GuestTable } from '@/components/reports/GuestTable';
+import { AddGuestDialog } from '@/components/events/AddGuestDialog';
+import { GuestImportDialog } from '@/components/events/GuestImportDialog';
 import { Button } from '@/components/ui/button';
 import { formatNumber, pluralize } from '@/lib/format';
 
@@ -25,6 +28,8 @@ export function EventGuests({ eventId }: Props) {
     const { data, loading, error, refetch } = useApiQuery<EventReport | null>(
         eventId ? `/admin/events/${eventId}/report/` : null
     );
+    const [importOpen, setImportOpen] = useState(false);
+    const [addOpen, setAddOpen] = useState(false);
 
     if (loading) {
         return (
@@ -63,16 +68,33 @@ export function EventGuests({ eventId }: Props) {
                         </span>
                     </div>
                     {report ? (
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            render={
-                                <Link href={`/dashboard/reports/${eventId}`} />
-                            }
-                        >
-                            <FileText className="size-3.5" />
-                            Open full report
-                        </Button>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <Button
+                                size="sm"
+                                onClick={() => setAddOpen(true)}
+                            >
+                                <UserPlus className="size-3.5" />
+                                Add guest
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setImportOpen(true)}
+                            >
+                                <Upload className="size-3.5" />
+                                Import CSV
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                render={
+                                    <Link href={`/dashboard/reports/${eventId}`} />
+                                }
+                            >
+                                <FileText className="size-3.5" />
+                                Open full report
+                            </Button>
+                        </div>
                     ) : null}
                 </div>
 
@@ -83,7 +105,26 @@ export function EventGuests({ eventId }: Props) {
                                 compact
                                 icon={<Users />}
                                 title="No guests yet"
-                                description="Guests appear here as soon as they are registered — via an ambassador, the organizer API key, or a report import."
+                                description="Guests appear here as soon as they are registered — add one by hand, import a CSV, or let an ambassador or the organizer API register them."
+                                action={
+                                    <div className="flex flex-wrap items-center justify-center gap-2">
+                                        <Button
+                                            size="sm"
+                                            onClick={() => setAddOpen(true)}
+                                        >
+                                            <UserPlus className="size-3.5" />
+                                            Add a guest
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => setImportOpen(true)}
+                                        >
+                                            <Upload className="size-3.5" />
+                                            Import guest list
+                                        </Button>
+                                    </div>
+                                }
                             />
                         </div>
                     ) : (
@@ -91,6 +132,22 @@ export function EventGuests({ eventId }: Props) {
                     )}
                 </div>
             </ReportPanel>
+
+            <AddGuestDialog
+                open={addOpen}
+                onOpenChange={setAddOpen}
+                eventId={eventId}
+                categories={report?.event.categories ?? []}
+                customFields={report?.custom_fields ?? []}
+                onCreated={() => void refetch()}
+            />
+
+            <GuestImportDialog
+                open={importOpen}
+                onOpenChange={setImportOpen}
+                eventId={eventId}
+                onImported={() => void refetch()}
+            />
         </div>
     );
 }

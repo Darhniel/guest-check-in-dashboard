@@ -7,8 +7,7 @@ import {
 } from './auth';
 import { DEMO_MODE, demoRequest } from './demo-data';
 
-const API_BASE_URL =
-    process.env.NEXT_PUBLIC_API_URL;
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export { API_BASE_URL, isAccessTokenExpired };
 
