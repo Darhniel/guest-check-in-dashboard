@@ -4,6 +4,7 @@ const nextConfig: NextConfig = {
   /* config options here */
   experimental: {
     agentFeedback: true,
+    agentUpgrade: "security",
     // The dashboard is a client-rendered SPA behind a localStorage auth gate, so
     // route segments are intentionally dropped while the session resolves.
     instantInsights: {
