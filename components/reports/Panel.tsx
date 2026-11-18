@@ -5,12 +5,16 @@ import { cn } from '@/lib/utils';
 export function ReportPanel({
     children,
     className,
+    pdfExclude = false,
 }: {
     children: ReactNode;
     className?: string;
+    /** Hide this panel when the client-facing PDF is captured. */
+    pdfExclude?: boolean;
 }) {
     return (
         <section
+            data-pdf-exclude={pdfExclude ? 'true' : undefined}
             className={cn(
                 'rounded-xl bg-card shadow-card ring-1 ring-border',
                 className

@@ -43,7 +43,13 @@ function DailyTooltip({
     );
 }
 
-export function DailyAttendanceChart({ data }: { data: ReportDailyPoint[] }) {
+export function DailyAttendanceChart({
+    data,
+    animate = true,
+}: {
+    data: ReportDailyPoint[];
+    animate?: boolean;
+}) {
     return (
         <div className="h-[250px] w-full sm:h-[280px]">
             <ResponsiveContainer width="100%" height="100%">
@@ -85,6 +91,7 @@ export function DailyAttendanceChart({ data }: { data: ReportDailyPoint[] }) {
                         fill="var(--brand)"
                         radius={[5, 5, 0, 0]}
                         maxBarSize={40}
+                        isAnimationActive={animate}
                         animationDuration={600}
                     />
                     <Bar
@@ -93,6 +100,7 @@ export function DailyAttendanceChart({ data }: { data: ReportDailyPoint[] }) {
                         fillOpacity={0.55}
                         radius={[5, 5, 0, 0]}
                         maxBarSize={40}
+                        isAnimationActive={animate}
                         animationDuration={600}
                     />
                 </BarChart>

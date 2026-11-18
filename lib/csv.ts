@@ -10,24 +10,13 @@ export type GuestField =
     | 'names'
     | 'email'
     | 'phone'
-    | 'category_name'
-    | 'kids'
-    | 'kid_name'
-    | 'kid_age'
-    | 'kid_gender';
-
-export interface KidInput {
-    name: string;
-    age: number;
-    gender: string;
-}
+    | 'category_name';
 
 export interface GuestPayload {
     names: string;
     email: string;
     phone: string;
     category_name: string;
-    kids: KidInput[];
 }
 
 export interface GuestImportRow {
@@ -57,10 +46,6 @@ export const GUEST_FIELD_LABELS: Record<GuestField, string> = {
     email: 'Email',
     phone: 'Phone',
     category_name: 'Category',
-    kids: 'Kids',
-    kid_name: 'Kid name',
-    kid_age: 'Kid age',
-    kid_gender: 'Kid gender',
 };
 
 /**
@@ -68,10 +53,6 @@ export const GUEST_FIELD_LABELS: Record<GuestField, string> = {
  * normalised header first, then falls back to "contains".
  */
 const FIELD_ALIASES: Record<GuestField, string[]> = {
-    kids: ['kids', 'children', 'kids names', 'children names', 'kids details', 'children details'],
-    kid_name: ['kid name', 'child name', 'kid', 'child'],
-    kid_age: ['kid age', 'child age'],
-    kid_gender: ['kid gender', 'child gender', 'kid sex', 'child sex'],
     category_name: [
         'category',
         'category name',
@@ -114,10 +95,6 @@ const FIELD_ALIASES: Record<GuestField, string[]> = {
 };
 
 const FIELD_ORDER: GuestField[] = [
-    'kids',
-    'kid_name',
-    'kid_age',
-    'kid_gender',
     'category_name',
     'email',
     'phone',
@@ -133,25 +110,12 @@ export const GUEST_CSV_HEADERS = [
     'email',
     'phone',
     'category_name',
-    'kids',
 ];
 
 export const GUEST_CSV_ROWS = [
-    [
-        'Ada Obi',
-        'ada.obi@example.com',
-        '+234 801 234 5678',
-        'VIP',
-        'Tobi Obi (6)',
-    ],
-    [
-        'Chinedu Eze',
-        'chinedu.eze@example.com',
-        '+234 802 345 6789',
-        'Regular',
-        '',
-    ],
-    ['Ngozi Bello', '', '+234 803 456 7890', 'VIP', 'Ada Bello (4, F)'],
+    ['Ada Obi', 'ada.obi@example.com', '+234 801 234 5678', 'VIP'],
+    ['Chinedu Eze', 'chinedu.eze@example.com', '+234 802 345 6789', 'Regular'],
+    ['Ngozi Bello', '', '+234 803 456 7890', 'VIP'],
 ];
 
 /** CSV string with a header row and a few example guests. */
@@ -290,7 +254,7 @@ export function mapHeaders(headers: string[]): Partial<Record<GuestField, number
     const mapped: Partial<Record<GuestField, number>> = {};
     const available = new Set(normalised.map((_, index) => index));
 
-    // Exact matches first so "kid name" never satisfies "name".
+    // Exact matches first so a "category" column never satisfies "name".
     for (const field of FIELD_ORDER) {
         const index = normalised.findIndex(
             (header, position) =>
@@ -324,49 +288,6 @@ function cell(row: string[], index: number | undefined) {
     return (row[index] ?? '').trim();
 }
 
-function parseKid(part: string): KidInput | null {
-    const parenthesised = part.match(
-        /^(.*?)\s*\((\d{1,2})(?:\s*[,:]\s*([A-Za-z]+))?\)$/
-    );
-    if (parenthesised) {
-        const name = parenthesised[1].trim();
-        if (!name) return null;
-        return {
-            name,
-            age: Number(parenthesised[2]),
-            gender: (parenthesised[3] ?? '').trim(),
-        };
-    }
-
-    const bits = part
-        .split(/[:,]/)
-        .map((bit) => bit.trim())
-        .filter(Boolean);
-    const ageIndex = bits.findIndex(
-        (bit, index) => index > 0 && /^\d{1,2}$/.test(bit)
-    );
-    if (ageIndex === -1) return null;
-
-    const name = bits.slice(0, ageIndex).join(' ').trim();
-    if (!name) return null;
-
-    return {
-        name,
-        age: Number(bits[ageIndex]),
-        gender: bits[ageIndex + 1] ?? '',
-    };
-}
-
-/** `Tobi Obi (6); Ada Obi (4, F)` or `Tobi Obi:6:M | Ada Obi:4` */
-export function parseKidsCell(value: string): KidInput[] {
-    return value
-        .split(/[;|]/)
-        .map((part) => part.trim())
-        .filter(Boolean)
-        .map(parseKid)
-        .filter((kid): kid is KidInput => kid !== null);
-}
-
 export function buildGuestImportPlan(table: CsvTable): GuestImportPlan {
     const mapped = mapHeaders(table.headers);
     const usedColumns = new Set(Object.values(mapped));
@@ -394,16 +315,9 @@ export function buildGuestImportPlan(table: CsvTable): GuestImportPlan {
             email = '';
         }
 
-        // A guest is only accepted with a name plus at least one contact
-        // method, so the API never receives a row it would reject.
-        if (!email && !phone) {
-            skipped.push({
-                rowNumber,
-                reason: rawEmail
-                    ? 'Invalid email and no phone number'
-                    : 'Missing email or phone number',
-            });
-            return;
+        // Email and phone are both optional; the API only requires a name.
+        if (rawEmail && !email) {
+            warningList.push('Imported without an email address');
         }
 
         if (email) {
@@ -424,28 +338,6 @@ export function buildGuestImportPlan(table: CsvTable): GuestImportPlan {
             }
         }
 
-        const kids: KidInput[] = parseKidsCell(cell(raw, mapped.kids));
-
-        // Single-child columns, for sheets that put one kid per row.
-        const kidName = cell(raw, mapped.kid_name);
-        if (kidName) {
-            const age = Number(cell(raw, mapped.kid_age));
-            if (Number.isFinite(age) && age > 0 && age < 130) {
-                kids.push({
-                    name: kidName,
-                    age,
-                    gender: cell(raw, mapped.kid_gender),
-                });
-            } else {
-                warningList.push(`Kid "${kidName}" has no valid age — skipped`);
-            }
-        }
-
-        const kidsCell = cell(raw, mapped.kids);
-        if (kidsCell && kids.length === 0) {
-            warningList.push(`Could not read kids "${kidsCell}" — imported without them`);
-        }
-
         rows.push({
             rowNumber,
             payload: {
@@ -453,7 +345,6 @@ export function buildGuestImportPlan(table: CsvTable): GuestImportPlan {
                 email,
                 phone,
                 category_name: cell(raw, mapped.category_name),
-                kids,
             },
             warnings: warningList,
         });

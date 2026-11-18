@@ -178,11 +178,6 @@ export function GuestTable({ guests }: { guests: ReportGuest[] }) {
                                     <p className="truncate text-[12.5px] font-medium">
                                         {guest.names}
                                     </p>
-                                    {guest.kids_count > 0 ? (
-                                        <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[9.5px] text-muted-foreground">
-                                            +{guest.kids_count}
-                                        </span>
-                                    ) : null}
                                 </div>
                                 <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
                                     {guest.category ?? 'Uncategorized'} ·{' '}

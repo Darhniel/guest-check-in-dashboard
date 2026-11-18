@@ -108,15 +108,11 @@ function requestExample(eventId: number) {
   -H "Authorization: Bearer YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "guests": [
-      {
-        "names": "Ada Obi",
-        "email": "ada@example.com",
-        "phone": "+234 801 234 5678",
-        "category_name": "VIP",
-        "kids": [{ "name": "Tobi Obi", "age": 6, "gender": "M" }]
-      }
-    ]
+    "first_name": "Ada",
+    "last_name": "Obi",
+    "email": "ada@example.com",
+    "phone": "+234 801 234 5678",
+    "category_name": "VIP"
   }'`;
 }
 

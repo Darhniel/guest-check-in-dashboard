@@ -33,6 +33,39 @@ export const DEMO_USER: User = {
 const today = new Date();
 const day = (offset: number) => format(addDays(today, offset), 'yyyy-MM-dd');
 
+/**
+ * A tiny inline SVG used as a demo flyer so the report hero, palette
+ * extraction, HTML export, and PDF export can all be tried without a backend.
+ */
+const DEMO_FLYER = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="1200" viewBox="0 0 900 1200">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4C1D95"/>
+      <stop offset="0.55" stop-color="#7C3AED"/>
+      <stop offset="1" stop-color="#0EA5E9"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#FDE68A" stop-opacity="0.85"/>
+      <stop offset="1" stop-color="#FDE68A" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="900" height="1200" fill="url(#bg)"/>
+  <circle cx="720" cy="240" r="300" fill="url(#glow)"/>
+  <circle cx="120" cy="980" r="260" fill="#22D3EE" opacity="0.28"/>
+  <g fill="none" stroke="#FFFFFF" stroke-opacity="0.22" stroke-width="2">
+    <circle cx="450" cy="430" r="260"/>
+    <circle cx="450" cy="430" r="190"/>
+    <circle cx="450" cy="430" r="120"/>
+  </g>
+  <text x="70" y="180" fill="#FDE68A" font-family="Segoe UI, sans-serif" font-size="30" font-weight="700" letter-spacing="8">ACCREDIT • 2026</text>
+  <text x="70" y="700" fill="#FFFFFF" font-family="Segoe UI, sans-serif" font-size="92" font-weight="800">DESIGN</text>
+  <text x="70" y="800" fill="#FFFFFF" font-family="Segoe UI, sans-serif" font-size="92" font-weight="800">SYSTEMS</text>
+  <text x="70" y="900" fill="#FFFFFF" font-family="Segoe UI, sans-serif" font-size="92" font-weight="800">SUMMIT</text>
+  <text x="74" y="990" fill="#E0E7FF" font-family="Segoe UI, sans-serif" font-size="30" font-weight="500">Lagos · Talks, workshops, and community</text>
+</svg>
+`)}`;
+
 function schedule(startOffset: number, endOffset: number, open = '09:00', close = '18:00') {
     const days = eachDayOfInterval({
         start: parseISO(day(startOffset)),
@@ -71,6 +104,7 @@ let demoEvents: Event[] = [
         description:
             'Two days of talks, workshops, and hallway conversations for people building design systems at scale. Expect 2,000+ guests across four stages.',
         logo: null,
+        flyer: DEMO_FLYER,
         location_text: 'Eko Convention Centre · Lagos',
         start_date: day(-1),
         end_date: day(1),
@@ -105,6 +139,7 @@ let demoEvents: Event[] = [
         description:
             'An intimate evening for founders and operators. Dinner, a candid fireside chat, and room for the conversations that matter.',
         logo: null,
+        flyer: null,
         location_text: 'The Wheatbaker · Ikoyi',
         start_date: day(0),
         end_date: day(0),
@@ -130,6 +165,7 @@ let demoEvents: Event[] = [
         description:
             'Connecting 1,000 early-career builders with teams hiring right now. Portfolio reviews, mock interviews, and open roles.',
         logo: null,
+        flyer: null,
         location_text: 'Landmark Centre · Victoria Island',
         start_date: day(12),
         end_date: day(13),
@@ -156,6 +192,7 @@ let demoEvents: Event[] = [
         description:
             'A working retreat for senior product leaders. Small group sessions, long walks, and no slide decks.',
         logo: null,
+        flyer: null,
         location_text: 'La Campagne Tropicana · Ibeju-Lekki',
         start_date: day(34),
         end_date: day(36),
@@ -181,6 +218,7 @@ let demoEvents: Event[] = [
         description:
             'A celebration of the year behind us — awards, dinner, and dancing. Archived for reference.',
         logo: null,
+        flyer: null,
         location_text: 'Oriental Hotel · Victoria Island',
         start_date: day(-27),
         end_date: day(-26),
@@ -434,6 +472,7 @@ export async function demoRequest<T>(
             name: body.name ?? 'Untitled event',
             description: body.description ?? '',
             logo: null,
+            flyer: body.flyer ?? null,
             location_text: body.location_text ?? '',
             start_date: body.start_date ?? day(0),
             end_date: body.end_date ?? day(0),
@@ -715,7 +754,6 @@ export async function demoRequest<T>(
             date: entry.date,
             time: entry.time,
             is_accredited: true,
-            kids_count: 0,
         })) as T;
     }
 

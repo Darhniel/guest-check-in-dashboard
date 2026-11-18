@@ -37,6 +37,7 @@ export interface Event {
     name: string;
     description: string;
     logo: string | null;
+    flyer: string | null;
     location_text: string;
     start_date: string;
     end_date: string;
@@ -91,24 +92,16 @@ export interface GuestImportResponse {
     errors: { index: number; error: string; guest: string }[] | null;
 }
 
-export interface GuestCreateKidInput {
-    name: string;
-    age: number;
-    gender?: string;
-}
-
-/** Body accepted by POST /admin/events/<id>/guests/ (manual entry form). */
 export interface GuestCreateInput {
+    /** Legacy single-field name; the API splits it into first/last. */
     names: string;
+    first_name?: string;
+    last_name?: string;
     email?: string;
     phone?: string;
+    phone_number?: string;
     category_name?: string;
-    spouse_name?: string;
-    nanny_name?: string;
-    nanny_count?: number;
-    allergies?: string;
     custom_data?: Record<string, unknown>;
-    kids?: GuestCreateKidInput[];
 }
 
 /** The created guest, as returned by the manual-entry endpoint. */
@@ -116,16 +109,15 @@ export interface GuestCreateResponse {
     message?: string;
     id: number;
     names: string;
+    first_name: string;
+    last_name: string;
     /** @deprecated alias the API still emits during the rename; use `names`. */
     adult_names?: string;
-    spouse_name: string;
     email: string;
+    /** @deprecated alias kept during the phone -> phone_number rename. */
     phone: string;
-    nanny_name: string;
-    nanny_count: number;
-    allergies: string;
+    phone_number: string;
     category_name: string | null;
-    kids: { id: number; name: string; age: number; gender: string }[];
     ticket_number: string;
     custom_data: Record<string, unknown>;
     is_checked_in_today: boolean;
@@ -160,7 +152,6 @@ export interface AccreditationLogEntry {
     date: string;
     time: string;
     is_accredited: boolean;
-    kids_count: number;
 }
 
 export interface ReportDailyPoint {
@@ -210,7 +201,6 @@ export interface ReportGuest {
     phone: string;
     category: string | null;
     category_color: string | null;
-    kids_count: number;
     custom_data: Record<string, unknown>;
     checked_in: boolean;
     checkins: number;
@@ -261,6 +251,8 @@ export interface ReportsResponse {
 
 export interface EventReport {
     event: Event;
+    /** Event flyer as a base64 data URL, ready to embed in exported HTML. */
+    flyer_data?: string | null;
     generated_at: string;
     summary: Omit<ReportSummary, 'event' | 'daily'>;
     daily: ReportDailyPoint[];

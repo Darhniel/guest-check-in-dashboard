@@ -348,8 +348,8 @@ export function GuestImportDialog({
                             </DialogTitle>
                             <DialogDescription>
                                 Upload the organizer&apos;s CSV and we&apos;ll add
-                                every guest to this event. Each row needs a name
-                                plus an email or a phone number. Rows are matched
+                                every guest to this event. Each row needs a name;
+                                email and phone are optional. Rows are matched
                                 by email, or by name when there is no email.
                             </DialogDescription>
                         </DialogHeader>
@@ -439,7 +439,7 @@ export function GuestImportDialog({
 
                         {parsed && !error ? (
                             <div className="space-y-3">
-                                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                                <div className="grid grid-cols-3 gap-3">
                                     <Stat
                                         label="Rows"
                                         value={formatNumber(plan?.totalRows ?? 0)}
@@ -453,17 +453,6 @@ export function GuestImportDialog({
                                         label="Skipped"
                                         value={formatNumber(
                                             plan?.skipped.length ?? 0
-                                        )}
-                                        tone="muted"
-                                    />
-                                    <Stat
-                                        label="Kids"
-                                        value={formatNumber(
-                                            plan?.rows.reduce(
-                                                (total, row) =>
-                                                    total + row.payload.kids.length,
-                                                0
-                                            ) ?? 0
                                         )}
                                         tone="muted"
                                     />
@@ -549,7 +538,7 @@ export function GuestImportDialog({
                                                     Category
                                                 </th>
                                                 <th className="px-3 py-2 font-medium">
-                                                    Kids
+                                                    Phone
                                                 </th>
                                             </tr>
                                         </thead>
@@ -571,7 +560,7 @@ export function GuestImportDialog({
                                                             {row.payload.category_name || '—'}
                                                         </td>
                                                         <td className="px-3 py-1.5 text-muted-foreground tabular-nums">
-                                                            {row.payload.kids.length || '—'}
+                                                            {row.payload.phone || '—'}
                                                         </td>
                                                     </tr>
                                                 ))}

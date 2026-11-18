@@ -36,7 +36,13 @@ function ChartTooltip({
     );
 }
 
-export function CheckinsChart({ data }: { data: CheckinPoint[] }) {
+export function CheckinsChart({
+    data,
+    animate = true,
+}: {
+    data: CheckinPoint[];
+    animate?: boolean;
+}) {
     return (
         <div className="h-[240px] w-full sm:h-[280px]">
             <ResponsiveContainer width="100%" height="100%">
@@ -93,6 +99,7 @@ export function CheckinsChart({ data }: { data: CheckinPoint[] }) {
                         }}
                         animationDuration={650}
                         animationEasing="ease-out"
+                        isAnimationActive={animate}
                     />
                 </AreaChart>
             </ResponsiveContainer>

@@ -66,16 +66,13 @@ const importedGuests = new Map<number, ReportGuest[]>();
 
 export interface DemoGuestInput {
     names?: string;
+    first_name?: string;
+    last_name?: string;
     /** @deprecated accepted so older demo payloads keep working. */
     adult_names?: string;
     email?: string;
     phone?: string;
     category_name?: string;
-    spouse_name?: string;
-    nanny_name?: string;
-    nanny_count?: number;
-    allergies?: string;
-    kids?: { name?: string; age?: number | string; gender?: string }[];
 }
 
 /** Shared row builder for the demo import and manual-entry flows. */
@@ -89,8 +86,6 @@ function buildDemoGuest(
 
     const email = (guest.email ?? '').trim();
     const phone = (guest.phone ?? '').trim();
-    // Name plus email or phone is the same rule the API enforces.
-    if (!email && !phone) return null;
 
     const requested = (guest.category_name ?? '').trim().toLowerCase();
     const category = requested
@@ -105,9 +100,6 @@ function buildDemoGuest(
         phone,
         category: category?.name ?? null,
         category_color: category?.color ?? null,
-        kids_count: Array.isArray(guest.kids)
-            ? guest.kids.filter((kid) => kid?.name && Number(kid?.age) > 0).length
-            : 0,
         custom_data: {},
         checked_in: false,
         checkins: 0,
@@ -159,13 +151,9 @@ export function addDemoSingleGuest(event: Event, guest: DemoGuestInput) {
     const existing = importedGuests.get(event.id) ?? [];
     const name = (guest.names ?? guest.adult_names ?? '').trim();
     const email = (guest.email ?? '').trim();
-    const phone = (guest.phone ?? '').trim();
 
     if (!name) {
-        throw new Error('Names: At least one guest name is required.');
-    }
-    if (!email && !phone) {
-        throw new Error('Email: Provide an email address or a phone number.');
+        throw new Error('First name: A first name is required.');
     }
     if (isDemoDuplicate(existing, guest)) {
         throw new Error(
@@ -177,30 +165,23 @@ export function addDemoSingleGuest(event: Event, guest: DemoGuestInput) {
 
     const row = buildDemoGuest(event, guest, existing.length);
     if (!row) throw new Error('We could not add that guest.');
-
     existing.push(row);
     importedGuests.set(event.id, existing);
+
+    const [first_name = '', ...rest] = row.names.split(' ');
+    const last_name = rest.join(' ');
 
     return {
         message: 'Guest added.',
         id: row.id,
         names: row.names,
+        first_name,
+        last_name,
         adult_names: row.names,
-        spouse_name: (guest.spouse_name ?? '').trim(),
         email: row.email,
         phone: row.phone,
-        nanny_name: (guest.nanny_name ?? '').trim(),
-        nanny_count: Math.max(0, Number(guest.nanny_count) || 0),
-        allergies: (guest.allergies ?? '').trim(),
+        phone_number: row.phone,
         category_name: row.category,
-        kids: (guest.kids ?? [])
-            .filter((kid) => kid?.name && Number(kid?.age) >= 0)
-            .map((kid, index) => ({
-                id: index + 1,
-                name: String(kid.name).trim(),
-                age: Number(kid.age),
-                gender: kid.gender ?? '',
-            })),
         ticket_number: row.ticket_number,
         custom_data: {},
         is_checked_in_today: false,
@@ -444,7 +425,6 @@ function buildReport(
             )} ${String(1000 + ((index * 29) % 9000))}`,
             category: category?.name ?? null,
             category_color: category?.color ?? null,
-            kids_count: index % 17 === 0 ? 1 + (index % 3) : 0,
             custom_data:
                 event.custom_fields_schema?.fields?.length && index < 400
                     ? {

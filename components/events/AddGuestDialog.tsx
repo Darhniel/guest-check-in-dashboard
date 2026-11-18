@@ -1,7 +1,7 @@
 'use client';
 
-import { useRef, useState } from 'react';
-import { Loader2, Plus, Trash2, UserPlus } from 'lucide-react';
+import { useState } from 'react';
+import { Loader2, UserPlus } from 'lucide-react';
 import type {
     GuestCreateResponse,
     GuestCategory,
@@ -32,22 +32,11 @@ interface Props {
     onCreated: (guest: GuestCreateResponse) => void;
 }
 
-interface KidRow {
-    key: number;
-    name: string;
-    age: string;
-    gender: string;
-}
-
 const EMPTY_FORM = {
     names: '',
     email: '',
     phone: '',
     category: '',
-    spouse: '',
-    nanny: '',
-    nannyCount: '',
-    allergies: '',
 };
 
 function customInputType(type?: string) {
@@ -73,9 +62,7 @@ export function AddGuestDialog({
     customFields,
     onCreated,
 }: Props) {
-    const nextKidKey = useRef(1);
     const [form, setForm] = useState(EMPTY_FORM);
-    const [kids, setKids] = useState<KidRow[]>([]);
     const [custom, setCustom] = useState<Record<string, string | boolean>>({});
     const [error, setError] = useState('');
     const [saving, setSaving] = useState(false);
@@ -85,36 +72,13 @@ export function AddGuestDialog({
         setError('');
     };
 
-    const addKid = () => {
-        setKids((current) => [
-            ...current,
-            { key: nextKidKey.current++, name: '', age: '', gender: '' },
-        ]);
-        setError('');
-    };
-
-    const updateKid = (key: number, field: keyof KidRow, value: string) => {
-        setKids((current) =>
-            current.map((kid) =>
-                kid.key === key ? { ...kid, [field]: value } : kid
-            )
-        );
-        setError('');
-    };
-
     const updateCustom = (key: string, value: string | boolean) => {
         setCustom((current) => ({ ...current, [key]: value }));
         setError('');
     };
 
-    const removeKid = (key: number) => {
-        setKids((current) => current.filter((kid) => kid.key !== key));
-        setError('');
-    };
-
     const reset = () => {
         setForm(EMPTY_FORM);
-        setKids([]);
         setCustom({});
         setError('');
         setSaving(false);
@@ -128,27 +92,18 @@ export function AddGuestDialog({
         onOpenChange(next);
     };
 
-    /** Client-side mirror of the API rule: name plus email or phone. */
+    /** The name is the only required field; contact details are optional. */
     const validate = (): string => {
         if (!form.names.trim()) {
             return 'Enter the guest\u2019s name.';
         }
         const email = form.email.trim();
         const phone = form.phone.trim();
-        if (!email && !phone) {
-            return 'Add an email address or a phone number so the guest can be reached.';
-        }
         if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
             return 'That email address does not look right.';
         }
         if (phone && phone.length > 20) {
             return 'Phone numbers can be at most 20 characters.';
-        }
-        if (form.nannyCount.trim()) {
-            const count = Number(form.nannyCount);
-            if (!Number.isInteger(count) || count < 0) {
-                return 'Nanny count must be a whole number (0 or more).';
-            }
         }
 
         for (const field of customFields) {
@@ -157,31 +112,8 @@ export function AddGuestDialog({
                 return `${field.label} is required.`;
             }
         }
-
-        for (const [index, kid] of filledKids().entries()) {
-            if (!kid.name) {
-                return `Child ${index + 1}: enter a name.`;
-            }
-            if (!kid.age) {
-                return `Child ${index + 1}: enter an age.`;
-            }
-            const age = Number(kid.age);
-            if (!Number.isInteger(age) || age < 0 || age > 120) {
-                return `Child ${index + 1}: enter an age between 0 and 120.`;
-            }
-        }
         return '';
     };
-
-    /** Rows the user started filling in; untouched rows are ignored. */
-    const filledKids = () =>
-        kids
-            .map((kid) => ({
-                ...kid,
-                name: kid.name.trim(),
-                age: kid.age.trim(),
-            }))
-            .filter((kid) => kid.name || kid.age || kid.gender);
 
     const handleSubmit = async (event: React.FormEvent) => {
         event.preventDefault();
@@ -214,18 +146,7 @@ export function AddGuestDialog({
                         email: form.email.trim(),
                         phone: form.phone.trim(),
                         category_name: form.category.trim(),
-                        spouse_name: form.spouse.trim(),
-                        nanny_name: form.nanny.trim(),
-                        nanny_count: form.nannyCount.trim()
-                            ? Number(form.nannyCount)
-                            : 0,
-                        allergies: form.allergies.trim(),
                         custom_data: customData,
-                        kids: filledKids().map((kid) => ({
-                            name: kid.name,
-                            age: Number(kid.age),
-                            gender: kid.gender.trim(),
-                        })),
                     }),
                 }
             );
@@ -259,8 +180,7 @@ export function AddGuestDialog({
                     </DialogTitle>
                     <DialogDescription>
                         Enter the guest&apos;s details and we&apos;ll add them
-                        to this event. A name plus an email address or a phone
-                        number is required.
+                        to this event. Only the name is required.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -313,7 +233,7 @@ export function AddGuestDialog({
                                 disabled={saving}
                             />
                             <p className="text-[11px] text-muted-foreground">
-                                Email or phone — at least one is needed.
+                                Optional.
                             </p>
                         </div>
 
@@ -469,153 +389,6 @@ export function AddGuestDialog({
                             </div>
                         </div>
                     ) : null}
-
-                    <div className="space-y-3 rounded-xl border border-border bg-muted/20 p-4">
-                        <div className="flex items-center justify-between gap-2">
-                            <div>
-                                <p className="text-[12.5px] font-medium">
-                                    Children
-                                </p>
-                                <p className="text-[11px] text-muted-foreground">
-                                    Optional — add each child on their own row.
-                                </p>
-                            </div>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={addKid}
-                                disabled={saving}
-                            >
-                                <Plus className="size-3.5" />
-                                Add child
-                            </Button>
-                        </div>
-
-                        {kids.length > 0 ? (
-                            <div className="space-y-2">
-                                {kids.map((kid, index) => (
-                                    <div
-                                        key={kid.key}
-                                        className="grid grid-cols-[1fr_5.5rem_auto] items-center gap-2 sm:grid-cols-[1fr_5.5rem_7rem_auto]"
-                                    >
-                                        <Input
-                                            value={kid.name}
-                                            onChange={(event) =>
-                                                updateKid(
-                                                    kid.key,
-                                                    'name',
-                                                    event.target.value
-                                                )
-                                            }
-                                            placeholder={`Child ${index + 1} name`}
-                                            aria-label={`Child ${index + 1} name`}
-                                            disabled={saving}
-                                        />
-                                        <Input
-                                            type="number"
-                                            min={0}
-                                            max={120}
-                                            value={kid.age}
-                                            onChange={(event) =>
-                                                updateKid(
-                                                    kid.key,
-                                                    'age',
-                                                    event.target.value
-                                                )
-                                            }
-                                            placeholder="Age"
-                                            aria-label={`Child ${index + 1} age`}
-                                            disabled={saving}
-                                        />
-                                        <Input
-                                            className="hidden sm:block"
-                                            value={kid.gender}
-                                            onChange={(event) =>
-                                                updateKid(
-                                                    kid.key,
-                                                    'gender',
-                                                    event.target.value
-                                                )
-                                            }
-                                            placeholder="Gender"
-                                            aria-label={`Child ${index + 1} gender`}
-                                            disabled={saving}
-                                        />
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="icon-sm"
-                                            onClick={() => removeKid(kid.key)}
-                                            aria-label={`Remove child ${index + 1}`}
-                                            disabled={saving}
-                                        >
-                                            <Trash2 className="size-3.5" />
-                                        </Button>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : null}
-                    </div>
-
-                    <div className="grid gap-4 sm:grid-cols-2">
-                        <div className="space-y-1.5">
-                            <Label htmlFor="guest-spouse">
-                                Spouse / partner
-                            </Label>
-                            <Input
-                                id="guest-spouse"
-                                value={form.spouse}
-                                onChange={(event) =>
-                                    update('spouse', event.target.value)
-                                }
-                                placeholder="Optional"
-                                disabled={saving}
-                            />
-                        </div>
-
-                        <div className="space-y-1.5">
-                            <Label htmlFor="guest-nanny">Nanny</Label>
-                            <Input
-                                id="guest-nanny"
-                                value={form.nanny}
-                                onChange={(event) =>
-                                    update('nanny', event.target.value)
-                                }
-                                placeholder="Optional"
-                                disabled={saving}
-                            />
-                        </div>
-
-                        <div className="space-y-1.5">
-                            <Label htmlFor="guest-nanny-count">Nanny count</Label>
-                            <Input
-                                id="guest-nanny-count"
-                                type="number"
-                                min={0}
-                                value={form.nannyCount}
-                                onChange={(event) =>
-                                    update('nannyCount', event.target.value)
-                                }
-                                placeholder="0"
-                                disabled={saving}
-                            />
-                        </div>
-
-                        <div className="space-y-1.5 sm:col-span-2">
-                            <Label htmlFor="guest-allergies">Allergies</Label>
-                            <Textarea
-                                id="guest-allergies"
-                                value={form.allergies}
-                                onChange={(event) =>
-                                    update('allergies', event.target.value)
-                                }
-                                placeholder="Anything the team should know — optional"
-                                rows={2}
-                                disabled={saving}
-                            />
-                        </div>
-                    </div>
 
                     {error ? (
                         <p

@@ -482,9 +482,6 @@ function TodayArrivals({ eventId }: { eventId: number }) {
                                             entry.verified_by_name
                                                 ? `by ${entry.verified_by_name}`
                                                 : null,
-                                            entry.kids_count > 0
-                                                ? `${entry.kids_count} kid${entry.kids_count === 1 ? '' : 's'}`
-                                                : null,
                                         ]
                                             .filter(Boolean)
                                             .join(' · ')}

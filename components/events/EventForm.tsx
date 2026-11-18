@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Controller, useFieldArray, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -16,6 +16,7 @@ import {
     Plus,
     Sparkles,
     Trash2,
+    Upload,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import type { CustomField, Event } from '@/types';
@@ -37,6 +38,16 @@ import {
 import { toast } from '@/components/ui/toast';
 import { CustomFieldsBuilder } from './CustomFieldsBuilder';
 import { formatEventDates, formatNumber } from '@/lib/format';
+import { cn } from '@/lib/utils';
+
+function fileToBase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
 
 const formSchema = z
     .object({
@@ -150,6 +161,13 @@ export function EventForm({ event }: { event?: Event }) {
             ? event.daily_schedule
             : {}
     );
+    const [flyerPreview, setFlyerPreview] = useState<string | null>(
+        event?.flyer ?? null
+    );
+    const [flyerFile, setFlyerFile] = useState<File | null>(null);
+    const [flyerUploading, setFlyerUploading] = useState(false);
+    const [removeFlyer, setRemoveFlyer] = useState(false);
+    const flyerInputRef = useRef<HTMLInputElement>(null);
 
     const {
         register,
@@ -233,6 +251,72 @@ export function EventForm({ event }: { event?: Event }) {
         }));
     };
 
+    const handleFlyerChange = async (
+        changeEvent: React.ChangeEvent<HTMLInputElement>
+    ) => {
+        const file = changeEvent.target.files?.[0];
+        if (!file) return;
+
+        const allowedTypes = [
+            'image/png',
+            'image/jpeg',
+            'image/webp',
+            'image/gif',
+        ];
+
+        if (!allowedTypes.includes(file.type)) {
+            toast.add({
+                type: 'error',
+                title: 'Unsupported image',
+                description: 'Use a PNG, JPG, WebP, or GIF image.',
+            });
+            changeEvent.target.value = '';
+            return;
+        }
+
+        if (file.size > 5 * 1024 * 1024) {
+            toast.add({
+                type: 'error',
+                title: 'File too large',
+                description: 'Flyer must be 5 MB or smaller.',
+            });
+            changeEvent.target.value = '';
+            return;
+        }
+
+        setFlyerUploading(true);
+        try {
+            const preview = await fileToBase64(file);
+            setFlyerPreview(preview);
+            setFlyerFile(file);
+            setRemoveFlyer(false);
+        } catch {
+            toast.add({
+                type: 'error',
+                title: 'Could not process flyer',
+                description: 'Please try a different image.',
+            });
+        } finally {
+            setFlyerUploading(false);
+        }
+    };
+
+    const openFlyerPicker = () => {
+        if (flyerUploading) return;
+        if (flyerInputRef.current) {
+            // Reset first so choosing the same file again still fires change.
+            flyerInputRef.current.value = '';
+            flyerInputRef.current.click();
+        }
+    };
+
+    const handleRemoveFlyer = () => {
+        setFlyerPreview(null);
+        setFlyerFile(null);
+        setRemoveFlyer(true);
+        if (flyerInputRef.current) flyerInputRef.current.value = '';
+    };
+
     const onSubmit = async (data: FormData) => {
         setLoading(true);
         setError('');
@@ -251,7 +335,7 @@ export function EventForm({ event }: { event?: Event }) {
                 : {};
 
             const { locations, categories, ...eventFields } = data;
-            const payload = {
+            const payload: Record<string, unknown> = {
                 ...eventFields,
                 locations: locations.map(({ location_id, ...location }) => ({
                     ...location,
@@ -264,6 +348,15 @@ export function EventForm({ event }: { event?: Event }) {
                 daily_schedule: resolvedSchedule,
                 custom_fields_schema: customFieldsSchema,
             };
+
+            // The API accepts the flyer as a base64 data URL inside the same
+            // JSON payload. Only send it when it changed, so editing other
+            // fields never re-uploads or clears the existing flyer.
+            if (flyerFile) {
+                payload.flyer = await fileToBase64(flyerFile);
+            } else if (isEditing && removeFlyer) {
+                payload.flyer = null;
+            }
 
             await api(isEditing && event ? `/events/${event.id}/` : '/events/', {
                 method: isEditing ? 'PATCH' : 'POST',
@@ -410,6 +503,97 @@ export function EventForm({ event }: { event?: Event }) {
 
                     <Section
                         index="02"
+                        title="Event flyer"
+                        description="Upload a flyer/poster. Its colors will be used to theme the event report."
+                    >
+                        <div className="space-y-4">
+                            <div className="space-y-1.5">
+                                <Label htmlFor="flyer">Flyer image</Label>
+                                <div className="relative">
+                                    <input
+                                        ref={flyerInputRef}
+                                        id="flyer"
+                                        type="file"
+                                        accept="image/png,image/jpeg,image/webp,image/gif"
+                                        className="sr-only"
+                                        onChange={handleFlyerChange}
+                                        disabled={flyerUploading}
+                                    />
+                                    <div
+                                        className={cn(
+                                            'flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed p-6 transition-colors',
+                                            flyerPreview
+                                                ? 'border-transparent bg-muted/50'
+                                                : 'border-border hover:border-primary/50'
+                                        )}
+                                        onClick={openFlyerPicker}
+                                    >
+                                        {flyerPreview ? (
+                                            <>
+                                                <div className="relative w-full max-w-md aspect-[4/3] overflow-hidden rounded-lg">
+                                                    <img
+                                                        src={flyerPreview}
+                                                        alt="Flyer preview"
+                                                        className="size-full object-cover"
+                                                    />
+                                                </div>
+                                                <div className="flex items-center gap-3">
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={(e) => {
+                                                            e.preventDefault();
+                                                            e.stopPropagation();
+                                                            openFlyerPicker();
+                                                        }}
+                                                        disabled={flyerUploading}
+                                                    >
+                                                        <Upload className="size-3.5" />
+                                                        Change flyer
+                                                    </Button>
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                                        onClick={(e) => {
+                                                            e.preventDefault();
+                                                            e.stopPropagation();
+                                                            handleRemoveFlyer();
+                                                        }}
+                                                        disabled={flyerUploading}
+                                                    >
+                                                        <Trash2 className="size-3.5" />
+                                                        Remove
+                                                    </Button>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Upload className="size-10 text-muted-foreground" />
+                                                <div className="text-center">
+                                                    <p className="text-[14px] font-medium">Click to upload flyer</p>
+                                                    <p className="text-[12px] text-muted-foreground">
+                                                        PNG, JPG, or WebP · Max 5 MB
+                                                    </p>
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                                {flyerUploading && (
+                                    <div className="flex items-center gap-2 text-[12px] text-muted-foreground">
+                                        <Loader2 className="size-4 animate-spin" />
+                                        Processing flyer…
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </Section>
+
+                    <Section
+                        index="03"
                         title="Daily check-in hours"
                         description="Limit accreditation to an operating window."
                         action={
@@ -500,7 +684,7 @@ export function EventForm({ event }: { event?: Event }) {
                     </Section>
 
                     <Section
-                        index="03"
+                        index="04"
                         title="Accreditation points"
                         description="Where ambassadors will scan guests in."
                         action={
@@ -581,7 +765,7 @@ export function EventForm({ event }: { event?: Event }) {
                     </Section>
 
                     <Section
-                        index="04"
+                        index="05"
                         title="Guest categories"
                         description="Tiers used on badges and access rules."
                         action={
@@ -714,7 +898,7 @@ export function EventForm({ event }: { event?: Event }) {
                     </Section>
 
                     <Section
-                        index="05"
+                        index="06"
                         title="Custom guest fields"
                         description="Extra information to capture during accreditation."
                     >

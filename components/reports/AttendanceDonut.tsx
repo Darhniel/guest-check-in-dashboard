@@ -31,9 +31,11 @@ function LegendRow({
 export function AttendanceDonut({
     accredited,
     total,
+    animate = true,
 }: {
     accredited: number;
     total: number;
+    animate?: boolean;
 }) {
     const remaining = Math.max(0, total - accredited);
     const rate =
@@ -59,6 +61,7 @@ export function AttendanceDonut({
                             endAngle={-270}
                             cornerRadius={6}
                             stroke="none"
+                            isAnimationActive={animate}
                             animationDuration={700}
                         >
                             {data.map((entry) => (

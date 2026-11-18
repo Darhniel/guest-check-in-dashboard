@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useDeferredValue, useMemo, useState } from 'react';
+import { useDeferredValue, useMemo, useState, useEffect } from 'react';
 import {
     ArrowUpRight,
     BarChart3,
@@ -35,6 +35,7 @@ import {
     type EventStatus,
 } from '@/lib/format';
 import { cn } from '@/lib/utils';
+import { useAnimatedNumber } from '@/lib/use-animated-number';
 
 type Filter = 'all' | EventStatus;
 
@@ -52,39 +53,62 @@ const statusOrder: Record<EventStatus, number> = {
     unknown: 3,
 };
 
+interface PlayfulReportStatProps {
+    label: string;
+    targetValue: number;
+    hint: string;
+    icon: React.ElementType;
+    tone: string;
+}
+
 function ReportStat({
     label,
-    value,
+    targetValue,
     hint,
     icon: Icon,
     tone,
-}: {
-    label: string;
-    value: string;
-    hint: string;
-    icon: typeof Users;
-    tone: string;
-}) {
+}: PlayfulReportStatProps) {
+    const animatedValue = useAnimatedNumber(targetValue, 1500); // 1.5s playful duration
+    const [isFinished, setIsFinished] = useState(false);
+
+    useEffect(() => {
+        if (animatedValue === targetValue && targetValue > 0) {
+            setIsFinished(true);
+            // Reset the flag after animation completes so it can re-trigger if data changes
+            const timer = setTimeout(() => setIsFinished(false), 400);
+            return () => clearTimeout(timer);
+        }
+    }, [animatedValue, targetValue]);
+
+    // Format the number (e.g., 1234 -> "1,234")
+    const formattedValue = new Intl.NumberFormat('en-US').format(animatedValue);
+
     return (
-        <div className="flex items-center gap-3 rounded-xl bg-card p-3 shadow-card ring-1 ring-border lg:flex-col lg:items-start lg:p-4">
-            <span
-                className={cn(
-                    'flex size-8 shrink-0 items-center justify-center rounded-lg',
-                    tone
-                )}
-            >
-                <Icon className="size-4" strokeWidth={1.9} />
-            </span>
-            <div className="min-w-0">
-                <p className="text-[10px] font-medium tracking-[0.09em] text-muted-foreground uppercase">
-                    {label}
-                </p>
-                <p className="mt-0.5 text-[20px] leading-none font-semibold tracking-[-0.02em] tabular-nums lg:text-[24px]">
-                    {value}
-                </p>
-                <p className="mt-1 hidden text-[11px] text-muted-foreground lg:block">
-                    {hint}
-                </p>
+        <div className="group relative overflow-hidden rounded-xl bg-card p-4 ring-1 ring-border transition-all duration-300 hover:shadow-md hover:ring-brand/20">
+            <div className={`absolute inset-0 opacity-0 transition-opacity duration-500 group-hover:opacity-100 bg-gradient-to-br ${tone.replace('text-', 'from-').replace('bg-', 'to-')} /5`} />
+
+            <div className="relative flex items-start justify-between">
+                <div>
+                    <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                        {label}
+                    </p>
+                    <div className="mt-1 flex items-baseline gap-1">
+                        <span
+                            className={`text-[28px] font-bold leading-none tracking-tight tabular-nums transition-transform duration-300 [transition-timing-function:var(--ease-spring)] ${isFinished ? 'animate-pop-finish' : ''
+                                }`}
+                        >
+                            {formattedValue}
+                        </span>
+                    </div>
+                    <p className="mt-1.5 text-[11px] text-muted-foreground/80">
+                        {hint}
+                    </p>
+                </div>
+
+                {/* Icon with a gentle, continuous float + hover bounce */}
+                <div className={`flex size-10 items-center justify-center rounded-lg ${tone} transition-transform duration-300 [transition-timing-function:var(--ease-spring)] group-hover:scale-110 group-hover:rotate-3`}>
+                    <Icon className="size-5" />
+                </div>
             </div>
         </div>
     );
@@ -224,11 +248,11 @@ export default function ReportsPage() {
                     description={
                         data
                             ? `${pluralize(
-                                  data.totals.events,
-                                  'event'
-                              )} · ${formatNumber(
-                                  data.totals.accredited_guests
-                              )} guests accredited across the workspace`
+                                data.totals.events,
+                                'event'
+                            )} · ${formatNumber(
+                                data.totals.accredited_guests
+                            )} guests accredited across the workspace`
                             : 'Attendance, guest mix, and team performance for every event.'
                     }
                     actions={
@@ -236,11 +260,12 @@ export default function ReportsPage() {
                             variant="outline"
                             onClick={handleExport}
                             disabled={!data || exporting}
+                            className="active:animate-jelly transition-transform duration-200 cursor-pointer"
                         >
                             {exporting ? (
                                 <Loader2 className="size-4 animate-spin" />
                             ) : (
-                                <Download className="size-4" />
+                                <Download className="size-4 transition-transform duration-200 group-hover:translate-y-0.5" />
                             )}
                             {exporting ? 'Preparing…' : 'Download overview'}
                         </Button>
@@ -259,12 +284,16 @@ export default function ReportsPage() {
                 <ReportsSkeleton />
             ) : reports.length === 0 ? (
                 <EmptyState
-                    icon={<BarChart3 />}
+                    icon={
+                        <div className="animate-float rounded-full bg-brand/10 p-4 text-brand">
+                            <BarChart3 className="size-8" />
+                        </div>
+                    }
                     title="No reports yet"
                     description="Create an event and start accrediting guests. Its attendance report will appear here automatically."
                     action={
-                        <Button render={<Link href="/dashboard/events/new" />}>
-                            <CalendarPlus className="size-4" />
+                        <Button render={<Link href="/dashboard/events/new" />} className="group active:animate-jelly">
+                            <CalendarPlus className="size-4 transition-transform duration-300 [transition-timing-function:var(--ease-spring)] group-hover:rotate-12" />
                             Create event
                         </Button>
                     }
@@ -274,28 +303,28 @@ export default function ReportsPage() {
                     <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
                         <ReportStat
                             label="Guests"
-                            value={formatNumber(data.totals.total_guests)}
+                            targetValue={data.totals.total_guests}
                             hint="Across every event"
                             icon={Users}
                             tone="bg-brand-subtle text-brand"
                         />
                         <ReportStat
                             label="Accredited"
-                            value={formatNumber(data.totals.accredited_guests)}
+                            targetValue={data.totals.accredited_guests}
                             hint="At least one check-in"
                             icon={ArrowUpRight}
                             tone="bg-success-subtle text-success"
                         />
                         <ReportStat
                             label="Attendance"
-                            value={`${data.totals.attendance_rate}%`}
+                            targetValue={data.totals.attendance_rate}
                             hint="Accredited ÷ total guests"
                             icon={BarChart3}
                             tone="bg-warning-subtle text-warning"
                         />
                         <ReportStat
                             label="Check-ins"
-                            value={formatNumber(data.totals.total_checkins)}
+                            targetValue={data.totals.total_checkins}
                             hint={`${formatNumber(
                                 data.totals.checked_in_today
                             )} today`}
@@ -413,12 +442,17 @@ function ReportCard({
     return (
         <Link
             href={`/dashboard/reports/${report.event.id}`}
-            className="group animate-enter flex flex-col gap-4 rounded-xl bg-card p-4 shadow-card ring-1 ring-border transition-[box-shadow,border-color] duration-200 outline-none hover:shadow-float hover:ring-foreground/20 focus-visible:ring-2 focus-visible:ring-ring/50 sm:p-5"
-            style={{ animationDelay: `${Math.min(index, 5) * 40}ms` }}
+            className="group animate-pop-in relative flex flex-col gap-4 rounded-xl bg-card p-4 shadow-sm ring-1 ring-border outline-none transition-all duration-300 [transition-timing-function:var(--ease-spring)] hover:-translate-y-1.5 hover:shadow-xl hover:ring-brand/30 focus-visible:ring-2 focus-visible:ring-ring/50 sm:p-5"
+            style={{ animationDelay: `${Math.min(index, 5) * 60}ms` }}
         >
+            <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-brand/5 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+
             <div className="flex items-start justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-3">
-                    <EventMark name={report.event.name} seed={report.event.id} />
+                    <div className="animate-float">
+                        <EventMark name={report.event.name} seed={report.event.id} />
+                    </div>
+
                     <div className="min-w-0">
                         <h2 className="truncate text-[14px] font-semibold tracking-[-0.01em]">
                             {report.event.name}
@@ -456,7 +490,7 @@ function ReportCard({
                 </div>
                 <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
                     <div
-                        className="h-full rounded-full bg-brand transition-[width] duration-700 ease-out-soft"
+                        className="h-full rounded-full bg-brand transition-[width] duration-700 [transition-timing-function:var(--ease-spring)]"
                         style={{
                             width: `${Math.min(100, report.attendance_rate)}%`,
                         }}
@@ -509,9 +543,9 @@ function ReportCard({
                         </span>
                     ) : null}
                 </div>
-                <span className="flex items-center gap-1.5 text-[11.5px] font-medium text-muted-foreground transition-colors duration-200 group-hover:text-foreground">
+                <span className="flex items-center gap-1.5 text-[11.5px] font-medium text-muted-foreground transition-colors duration-200 group-hover:text-brand">
                     Open report
-                    <ArrowUpRight className="size-3.5 transition-transform duration-200 ease-snappy group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+                    <ArrowUpRight className="size-3.5 transition-transform duration-300 [transition-timing-function:var(--ease-bounce)] group-hover:-translate-y-1 group-hover:translate-x-1 group-hover:scale-110" />
                 </span>
             </div>
         </Link>
