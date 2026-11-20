@@ -1,11 +1,27 @@
+export type UserRole = 'admin' | 'supervisor' | 'ambassador';
+
 export interface User {
     id: number;
     email: string;
     full_name: string;
-    role: 'admin' | 'ambassador';
+    role: UserRole;
     first_login: boolean;
     is_active?: boolean;
     phone?: string;
+    date_joined?: string;
+}
+
+export interface AdminUserCreateInput {
+    full_name: string;
+    email: string;
+    phone?: string;
+    password: string;
+    role: Extract<UserRole, 'admin' | 'supervisor'>;
+}
+
+export interface AdminUserCreateResponse {
+    message: string;
+    user: User;
 }
 
 export interface Location {

@@ -62,7 +62,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     <UserProvider user={user}>{children}</UserProvider>
                 </main>
             </div>
-            <MobileBottomNav />
+            <MobileBottomNav user={user} />
         </div>
     );
 }

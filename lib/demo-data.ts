@@ -7,6 +7,8 @@ import type {
     Location,
     OrganizerApiKey,
     OrganizerApiKeyCreateResponse,
+    AdminUserCreateInput,
+    AdminUserCreateResponse,
     User,
 } from '@/types';
 import {
@@ -28,6 +30,7 @@ export const DEMO_USER: User = {
     first_login: false,
     is_active: true,
     phone: '+234 802 555 0100',
+    date_joined: '2025-01-15T10:00:00Z',
 };
 
 const today = new Date();
@@ -314,6 +317,29 @@ let demoAmbassadors: User[] = [
     },
 ];
 
+let demoAdmins: User[] = [
+    {
+        id: 1,
+        email: 'admin@accreditation.app',
+        full_name: 'Amara Okonkwo',
+        role: 'admin',
+        first_login: false,
+        is_active: true,
+        phone: '+234 802 555 0100',
+        date_joined: '2025-01-15T10:00:00Z',
+    },
+    {
+        id: 2,
+        email: 'supervisor@accreditation.app',
+        full_name: 'Kwame Asante',
+        role: 'supervisor',
+        first_login: false,
+        is_active: true,
+        phone: '+233 24 111 2233',
+        date_joined: '2025-06-20T14:30:00Z',
+    },
+];
+
 const assignments: Record<number, number[]> = {
     1: [101, 102, 103, 104, 105, 106],
     2: [101, 105, 108],
@@ -458,6 +484,33 @@ export async function demoRequest<T>(
 
     if (method === 'GET' && /^\/admin\/ambassadors\/list\/?$/.test(path)) {
         return [...demoAmbassadors] as T;
+    }
+
+    if (method === 'GET' && /^\/admin\/admins\/?$/.test(path)) {
+        return [...demoAdmins] as T;
+    }
+
+    if (method === 'POST' && /^\/admin\/admins\/?$/.test(path)) {
+        const body = jsonBody<AdminUserCreateInput>(options);
+        if (demoAdmins.some((admin) => admin.email.toLowerCase() === body.email?.toLowerCase())) {
+            throw new Error('A user with this email address already exists.');
+        }
+        const id = Math.max(...demoAdmins.map((admin) => admin.id)) + 1;
+        const created: User = {
+            id,
+            email: body.email ?? '',
+            full_name: body.full_name ?? '',
+            role: body.role ?? 'supervisor',
+            first_login: true,
+            is_active: true,
+            phone: body.phone ?? '',
+            date_joined: new Date().toISOString(),
+        };
+        demoAdmins = [...demoAdmins, created];
+        return {
+            message: 'Admin user created successfully.',
+            user: created,
+        } satisfies AdminUserCreateResponse as T;
     }
 
     if (method === 'GET' && /^\/events\/?$/.test(path)) {

@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import type { ReportSummary, ReportsResponse } from '@/types';
 import { useApiQuery } from '@/hooks/useApi';
+import { useUser } from '@/components/layout/UserProvider';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { EventMark } from '@/components/common/EventMark';
 import { StatusBadge } from '@/components/common/StatusBadge';
@@ -35,6 +36,7 @@ import {
     type EventStatus,
 } from '@/lib/format';
 import { cn } from '@/lib/utils';
+import { isFullAdmin } from '@/lib/roles';
 import { useAnimatedNumber } from '@/lib/use-animated-number';
 
 type Filter = 'all' | EventStatus;
@@ -153,6 +155,8 @@ function ReportsSkeleton() {
 }
 
 export default function ReportsPage() {
+    const user = useUser();
+    const canCreate = isFullAdmin(user);
     const { data, loading, error, refetch } = useApiQuery<ReportsResponse>(
         '/admin/reports/'
     );
@@ -292,10 +296,12 @@ export default function ReportsPage() {
                     title="No reports yet"
                     description="Create an event and start accrediting guests. Its attendance report will appear here automatically."
                     action={
-                        <Button render={<Link href="/dashboard/events/new" />} className="group active:animate-jelly">
-                            <CalendarPlus className="size-4 transition-transform duration-300 [transition-timing-function:var(--ease-spring)] group-hover:rotate-12" />
-                            Create event
-                        </Button>
+                        canCreate ? (
+                            <Button render={<Link href="/dashboard/events/new" />} className="group active:animate-jelly">
+                                <CalendarPlus className="size-4 transition-transform duration-300 [transition-timing-function:var(--ease-spring)] group-hover:rotate-12" />
+                                Create event
+                            </Button>
+                        ) : undefined
                     }
                 />
             ) : (

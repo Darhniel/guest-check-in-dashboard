@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import type { Event } from '@/types';
 import { useApiQuery } from '@/hooks/useApi';
+import { useUser } from '@/components/layout/UserProvider';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { EventMark } from '@/components/common/EventMark';
 import { StatusBadge } from '@/components/common/StatusBadge';
@@ -30,6 +31,7 @@ import {
     type EventStatus,
 } from '@/lib/format';
 import { cn } from '@/lib/utils';
+import { isFullAdmin } from '@/lib/roles';
 
 type Filter = 'all' | EventStatus;
 
@@ -58,6 +60,8 @@ function EventsSkeleton() {
 }
 
 export default function EventsPage() {
+    const user = useUser();
+    const canCreate = isFullAdmin(user);
     const { data, loading, error, refetch } = useApiQuery<Event[]>('/events/');
     const [search, setSearch] = useState('');
     const deferredSearch = useDeferredValue(search);
@@ -116,10 +120,12 @@ export default function EventsPage() {
                         </>
                     }
                     actions={
-                        <Button render={<Link href="/dashboard/events/new" />}>
-                            <Plus className="size-4" />
-                            Create event
-                        </Button>
+                        canCreate ? (
+                            <Button render={<Link href="/dashboard/events/new" />}>
+                                <Plus className="size-4" />
+                                Create event
+                            </Button>
+                        ) : undefined
                     }
                 />
             </div>
@@ -212,10 +218,12 @@ export default function EventsPage() {
                     }
                     action={
                         events.length === 0 ? (
-                            <Button render={<Link href="/dashboard/events/new" />}>
-                                <Plus className="size-4" />
-                                Create event
-                            </Button>
+                            canCreate ? (
+                                <Button render={<Link href="/dashboard/events/new" />}>
+                                    <Plus className="size-4" />
+                                    Create event
+                                </Button>
+                            ) : undefined
                         ) : (
                             <Button
                                 variant="outline"

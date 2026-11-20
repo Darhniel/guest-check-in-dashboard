@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { isAuthenticated, isDemoMode, setAuthData, signInDemo } from '@/lib/auth';
+import { canViewConsole } from '@/lib/roles';
 import type { User } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -164,8 +165,8 @@ export default function LoginPage() {
                 body: JSON.stringify({ email, password }),
             });
 
-            if (data.user?.role !== 'admin') {
-                setError('This account does not have admin access.');
+            if (!canViewConsole(data.user)) {
+                setError('This account does not have console access.');
                 return;
             }
 

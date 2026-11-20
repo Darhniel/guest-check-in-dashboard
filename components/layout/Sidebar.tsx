@@ -6,12 +6,13 @@ import { BadgeCheck, Plus } from 'lucide-react';
 import type { User } from '@/types';
 import { isDemoMode } from '@/lib/auth';
 import { cn } from '@/lib/utils';
-import { navItems, isNavActive } from '@/components/layout/nav';
+import { navItemsForRole, isNavActive } from '@/components/layout/nav';
 import { UserMenu } from '@/components/layout/UserMenu';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
 
 export function Sidebar({ user }: { user: User | null }) {
     const pathname = usePathname();
+    const items = navItemsForRole(user?.role);
 
     return (
         <aside className="fixed inset-y-0 left-0 z-30 hidden w-[264px] flex-col border-r border-sidebar-border bg-sidebar lg:flex">
@@ -34,7 +35,7 @@ export function Sidebar({ user }: { user: User | null }) {
                     Workspace
                 </p>
                 <nav aria-label="Primary" className="space-y-0.5">
-                    {navItems.map((item) => {
+                    {items.map((item) => {
                         const active = isNavActive(pathname, item.href);
                         const Icon = item.icon;
                         return (
@@ -68,24 +69,26 @@ export function Sidebar({ user }: { user: User | null }) {
                 </nav>
             </div>
 
-            <div className="mt-6 px-3">
-                <Link
-                    href="/dashboard/events/new"
-                    className="group flex items-center gap-3 rounded-xl border border-dashed border-border bg-card/60 p-3 outline-none transition-colors duration-150 hover:border-foreground/20 hover:bg-card focus-visible:ring-2 focus-visible:ring-ring/40"
-                >
-                    <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground transition-colors duration-150 group-hover:bg-brand-subtle group-hover:text-brand">
-                        <Plus className="size-4" />
-                    </span>
-                    <span className="min-w-0">
-                        <span className="block text-[12px] font-medium text-foreground">
-                            New event
+            {user?.role === 'admin' ? (
+                <div className="mt-6 px-3">
+                    <Link
+                        href="/dashboard/events/new"
+                        className="group flex items-center gap-3 rounded-xl border border-dashed border-border bg-card/60 p-3 outline-none transition-colors duration-150 hover:border-foreground/20 hover:bg-card focus-visible:ring-2 focus-visible:ring-ring/40"
+                    >
+                        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground transition-colors duration-150 group-hover:bg-brand-subtle group-hover:text-brand">
+                            <Plus className="size-4" />
                         </span>
-                        <span className="block text-[11px] text-muted-foreground">
-                            Set up accreditation
+                        <span className="min-w-0">
+                            <span className="block text-[12px] font-medium text-foreground">
+                                New event
+                            </span>
+                            <span className="block text-[11px] text-muted-foreground">
+                                Set up accreditation
+                            </span>
                         </span>
-                    </span>
-                </Link>
-            </div>
+                    </Link>
+                </div>
+            ) : null}
 
             <div className="mt-auto p-3">
                 {isDemoMode ? (

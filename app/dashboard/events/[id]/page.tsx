@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import type { Event } from '@/types';
 import { useApiQuery } from '@/hooks/useApi';
+import { useUser } from '@/components/layout/UserProvider';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { ErrorState } from '@/components/common/ErrorState';
@@ -26,10 +27,13 @@ import { EventAnalytics } from '@/components/events/EventAnalytics';
 import { EventOrganizerApi } from '@/components/events/EventOrganizerApi';
 import { EventGuests } from '@/components/events/EventGuests';
 import { eventStatusMeta, formatEventDates, getEventStatus, pluralize } from '@/lib/format';
+import { isFullAdmin } from '@/lib/roles';
 
 export default function EventDetailPage() {
     const params = useParams();
     const router = useRouter();
+    const user = useUser();
+    const canManage = isFullAdmin(user);
     const id = Array.isArray(params.id) ? params.id[0] : params.id;
     const { data: event, loading, error, refetch } = useApiQuery<Event>(
         id ? `/events/${id}/` : null
@@ -104,27 +108,29 @@ export default function EventDetailPage() {
                         </div>
                     }
                     actions={
-                        <div className="flex items-center gap-2">
-                            <Button
-                                variant="outline"
-                                render={
-                                    <Link
-                                        href={`/dashboard/events/${event.id}/edit`}
-                                    />
-                                }
-                            >
-                                <Pencil className="size-4" />
-                                Edit event
-                            </Button>
-                            <Button
-                                variant="outline"
-                                onClick={() => setTab('ambassadors')}
-                                className="max-sm:hidden"
-                            >
-                                <Users className="size-4" />
-                                Manage team
-                            </Button>
-                        </div>
+                        canManage ? (
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    variant="outline"
+                                    render={
+                                        <Link
+                                            href={`/dashboard/events/${event.id}/edit`}
+                                        />
+                                    }
+                                >
+                                    <Pencil className="size-4" />
+                                    Edit event
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    onClick={() => setTab('ambassadors')}
+                                    className="max-sm:hidden"
+                                >
+                                    <Users className="size-4" />
+                                    Manage team
+                                </Button>
+                            </div>
+                        ) : undefined
                     }
                 />
             </div>
@@ -156,13 +162,15 @@ export default function EventDetailPage() {
                             <Users className="size-3.5" />
                             Guests
                         </TabsTrigger>
-                        <TabsTrigger
-                            value="organizer"
-                            className="h-10 flex-none gap-2 px-0.5 pb-3 text-[13px] data-active:after:bottom-0"
-                        >
-                            <KeyRound className="size-3.5" />
-                            Organizer
-                        </TabsTrigger>
+                        {canManage ? (
+                            <TabsTrigger
+                                value="organizer"
+                                className="h-10 flex-none gap-2 px-0.5 pb-3 text-[13px] data-active:after:bottom-0"
+                            >
+                                <KeyRound className="size-3.5" />
+                                Organizer
+                            </TabsTrigger>
+                        ) : null}
                         <TabsTrigger
                             value="analytics"
                             className="h-10 flex-none gap-2 px-0.5 pb-3 text-[13px] data-active:after:bottom-0"

@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { BadgeCheck } from 'lucide-react';
 import type { User } from '@/types';
 import { cn } from '@/lib/utils';
-import { navItems, isNavActive } from '@/components/layout/nav';
+import { navItemsForRole, isNavActive } from '@/components/layout/nav';
 import { MobileUserMenu } from '@/components/layout/UserMenu';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
 
@@ -33,16 +33,22 @@ export function MobileTopBar({ user }: { user: User | null }) {
     );
 }
 
-export function MobileBottomNav() {
+export function MobileBottomNav({ user }: { user: User | null }) {
     const pathname = usePathname();
+    const items = navItemsForRole(user?.role);
 
     return (
         <nav
             aria-label="Primary"
             className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/90 pt-1 backdrop-blur-xl lg:hidden"
         >
-            <div className="mx-auto grid max-w-md grid-cols-4">
-                {navItems.map((item) => {
+            <div
+                className="mx-auto grid max-w-md"
+                style={{
+                    gridTemplateColumns: `repeat(${Math.max(items.length, 1)}, minmax(0, 1fr))`,
+                }}
+            >
+                {items.map((item) => {
                     const active = isNavActive(pathname, item.href);
                     const Icon = item.icon;
                     return (

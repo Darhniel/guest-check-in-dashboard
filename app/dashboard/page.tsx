@@ -38,6 +38,7 @@ import {
     percent,
     pluralize,
 } from '@/lib/format';
+import { isFullAdmin } from '@/lib/roles';
 
 function Panel({
     children,
@@ -85,6 +86,7 @@ function OverviewSkeleton() {
 
 export default function DashboardHome() {
     const user = useUser();
+    const canCreate = isFullAdmin(user);
     const now = useNow();
     const statsQuery = useApiQuery<DashboardStats>('/admin/dashboard/stats/');
     const eventsQuery = useApiQuery<Event[]>('/events/');
@@ -166,10 +168,12 @@ export default function DashboardHome() {
                             >
                                 View events
                             </Button>
-                            <Button render={<Link href="/dashboard/events/new" />}>
-                                <Plus className="size-4" />
-                                Create event
-                            </Button>
+                            {canCreate ? (
+                                <Button render={<Link href="/dashboard/events/new" />}>
+                                    <Plus className="size-4" />
+                                    Create event
+                                </Button>
+                            ) : null}
                         </>
                     }
                 />
@@ -366,13 +370,15 @@ export default function DashboardHome() {
                                 title="Nothing on the calendar"
                                 description="Create an event to start accrediting guests."
                                 action={
-                                    <Button
-                                        size="sm"
-                                        render={<Link href="/dashboard/events/new" />}
-                                    >
-                                        <Plus className="size-3.5" />
-                                        Create event
-                                    </Button>
+                                    canCreate ? (
+                                        <Button
+                                            size="sm"
+                                            render={<Link href="/dashboard/events/new" />}
+                                        >
+                                            <Plus className="size-3.5" />
+                                            Create event
+                                        </Button>
+                                    ) : undefined
                                 }
                             />
                         </div>

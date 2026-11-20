@@ -9,11 +9,12 @@ import {
     isAccessTokenExpired,
     logout,
 } from '@/lib/auth';
+import { canViewConsole } from '@/lib/roles';
 import { User } from '@/types';
 
 type AuthState = { user: User | null; loading: boolean };
 
-export const useAuth = (requireAdmin = true) => {
+export const useAuth = (requireConsoleAccess = true) => {
     const router = useRouter();
     const [state, setState] = useState<AuthState>({ user: null, loading: true });
 
@@ -26,7 +27,7 @@ export const useAuth = (requireAdmin = true) => {
         }
 
         const user = getUser();
-        if (requireAdmin && user?.role !== 'admin') {
+        if (requireConsoleAccess && !canViewConsole(user)) {
             router.replace('/login');
             return;
         }
@@ -34,7 +35,7 @@ export const useAuth = (requireAdmin = true) => {
         // The session lives in localStorage, which is only readable after mount.
         // eslint-disable-next-line react-hooks/set-state-in-effect
         setState({ user, loading: false });
-    }, [router, requireAdmin]);
+    }, [router, requireConsoleAccess]);
 
     return state;
 };

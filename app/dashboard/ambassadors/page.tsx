@@ -17,6 +17,7 @@ import {
 import type { User } from '@/types';
 import { api } from '@/lib/api';
 import { useApiQuery } from '@/hooks/useApi';
+import { useUser } from '@/components/layout/UserProvider';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Avatar } from '@/components/common/Avatar';
 import { StatusBadge } from '@/components/common/StatusBadge';
@@ -54,6 +55,7 @@ import { AmbassadorCreateDialog } from '@/components/ambassadors/AmbassadorCreat
 import { AmbassadorEditDialog } from '@/components/ambassadors/AmbassadorEditDialog';
 import { toast } from '@/components/ui/toast';
 import { pluralize } from '@/lib/format';
+import { isFullAdmin } from '@/lib/roles';
 import { cn } from '@/lib/utils';
 
 type Filter = 'all' | 'active' | 'inactive';
@@ -144,6 +146,8 @@ function RowMenu({
 }
 
 export default function AmbassadorsPage() {
+    const user = useUser();
+    const canManage = isFullAdmin(user);
     const { data, loading, error, refetch, setData } = useApiQuery<User[]>(
         '/admin/ambassadors/list/'
     );
@@ -273,10 +277,12 @@ export default function AmbassadorsPage() {
                         </>
                     }
                     actions={
-                        <Button onClick={() => setCreateOpen(true)}>
-                            <UserPlus className="size-4" />
-                            Invite ambassador
-                        </Button>
+                        canManage ? (
+                            <Button onClick={() => setCreateOpen(true)}>
+                                <UserPlus className="size-4" />
+                                Invite ambassador
+                            </Button>
+                        ) : undefined
                     }
                 />
             </div>
@@ -359,10 +365,12 @@ export default function AmbassadorsPage() {
                     title="No ambassadors yet"
                     description="Invite your first ambassador to start accrediting guests at events."
                     action={
-                        <Button onClick={() => setCreateOpen(true)}>
-                            <UserPlus className="size-4" />
-                            Invite ambassador
-                        </Button>
+                        canManage ? (
+                            <Button onClick={() => setCreateOpen(true)}>
+                                <UserPlus className="size-4" />
+                                Invite ambassador
+                            </Button>
+                        ) : undefined
                     }
                 />
             ) : visible.length === 0 ? (
@@ -408,9 +416,11 @@ export default function AmbassadorsPage() {
                                     <TableHead className="h-9 text-[10px] font-medium tracking-[0.08em] text-muted-foreground uppercase">
                                         Status
                                     </TableHead>
-                                    <TableHead className="h-9 w-12 px-4 sm:px-5">
-                                        <span className="sr-only">Actions</span>
-                                    </TableHead>
+                                    {canManage ? (
+                                        <TableHead className="h-9 w-12 px-4 sm:px-5">
+                                            <span className="sr-only">Actions</span>
+                                        </TableHead>
+                                    ) : null}
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -454,22 +464,24 @@ export default function AmbassadorsPage() {
                                             />
                                         </TableCell>
                                         <TableCell className="px-4 text-right sm:px-5">
-                                            <RowMenu
-                                                ambassador={ambassador}
-                                                busy={
-                                                    togglingId === ambassador.id ||
-                                                    deletingId === ambassador.id
-                                                }
-                                                onEdit={() =>
-                                                    setEditing(ambassador)
-                                                }
-                                                onToggle={() =>
-                                                    setConfirmToggle(ambassador)
-                                                }
-                                                onDelete={() =>
-                                                    setConfirmDelete(ambassador)
-                                                }
-                                            />
+                                            {canManage ? (
+                                                <RowMenu
+                                                    ambassador={ambassador}
+                                                    busy={
+                                                        togglingId === ambassador.id ||
+                                                        deletingId === ambassador.id
+                                                    }
+                                                    onEdit={() =>
+                                                        setEditing(ambassador)
+                                                    }
+                                                    onToggle={() =>
+                                                        setConfirmToggle(ambassador)
+                                                    }
+                                                    onDelete={() =>
+                                                        setConfirmDelete(ambassador)
+                                                    }
+                                                />
+                                            ) : null}
                                         </TableCell>
                                     </TableRow>
                                 ))}
@@ -512,16 +524,18 @@ export default function AmbassadorsPage() {
                                         ) : null}
                                     </div>
                                 </div>
-                                <RowMenu
-                                    ambassador={ambassador}
-                                    busy={
-                                        togglingId === ambassador.id ||
-                                        deletingId === ambassador.id
-                                    }
-                                    onEdit={() => setEditing(ambassador)}
-                                    onToggle={() => setConfirmToggle(ambassador)}
-                                    onDelete={() => setConfirmDelete(ambassador)}
-                                />
+                                {canManage ? (
+                                    <RowMenu
+                                        ambassador={ambassador}
+                                        busy={
+                                            togglingId === ambassador.id ||
+                                            deletingId === ambassador.id
+                                        }
+                                        onEdit={() => setEditing(ambassador)}
+                                        onToggle={() => setConfirmToggle(ambassador)}
+                                        onDelete={() => setConfirmDelete(ambassador)}
+                                    />
+                                ) : null}
                             </li>
                         ))}
                     </ul>

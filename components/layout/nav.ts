@@ -1,11 +1,19 @@
-import { BarChart3, CalendarDays, LayoutDashboard, Users } from 'lucide-react';
+import {
+    BarChart3,
+    CalendarDays,
+    LayoutDashboard,
+    ShieldCheck,
+    Users,
+} from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import type { UserRole } from '@/types';
 
 export interface NavItem {
     href: string;
     label: string;
     shortLabel: string;
     icon: LucideIcon;
+    adminOnly?: boolean;
 }
 
 export const navItems: NavItem[] = [
@@ -33,7 +41,18 @@ export const navItems: NavItem[] = [
         shortLabel: 'Reports',
         icon: BarChart3,
     },
+    {
+        href: '/dashboard/admins',
+        label: 'Admins',
+        shortLabel: 'Admins',
+        icon: ShieldCheck,
+        adminOnly: true,
+    },
 ];
+
+export function navItemsForRole(role: UserRole | undefined) {
+    return navItems.filter((item) => !item.adminOnly || role === 'admin');
+}
 
 export function isNavActive(pathname: string, href: string) {
     if (href === '/dashboard') return pathname === '/dashboard';

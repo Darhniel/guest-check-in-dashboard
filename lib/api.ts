@@ -6,6 +6,11 @@ import {
     setAccessToken,
 } from './auth';
 import { DEMO_MODE, demoRequest } from './demo-data';
+import type {
+    AdminUserCreateInput,
+    AdminUserCreateResponse,
+    User,
+} from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -166,4 +171,13 @@ export const api = async <T = unknown>(
     if (response.status === 204) return {} as T;
 
     return response.json();
+};
+
+export const adminApi = {
+    listAdmins: () => api<User[]>('/admin/admins/'),
+    createAdmin: (data: AdminUserCreateInput) =>
+        api<AdminUserCreateResponse>('/admin/admins/', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        }),
 };
